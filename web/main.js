@@ -1,11 +1,11 @@
-// 3D-облако нейронов мухи (коммит C7). Симуляции здесь пока нет: только положения и классы клеток.
+// 3D-облако нейронов мухи (C7) с подсказкой, закреплением нейрона и поиском (C8). Симуляции здесь пока нет.
 import * as THREE from "three";
 import { OrbitControls } from "/web/vendor/OrbitControls.js";
+import { HEADER_BYTES, MAX_CLASSES, NO_POSITION, POINT_SIZE_UM } from "./constants.js";
+import { createCard, createSearch, createTooltip, getInfo, getLinks } from "./inspector.js";
+import { createLinks, createRings } from "./markers.js";
+import { createPicker } from "./picking.js";
 
-const HEADER_BYTES = 8; // uint32 число нейронов, uint32 версия формата
-const NO_POSITION = 255;
-const MAX_CLASSES = 16; // столько цветов в шейдере; совпадает с flybrain/webdata.py
-const POINT_SIZE_UM = 3.2; // видимый размер точки в мкм: примерно как тело клетки
 const MIN_POINT_PX = 1.3;
 const MAX_POINT_PX = 7;
 const POINT_ALPHA = 0.22; // ниже, чем хотелось бы глазу: иначе плотные зрительные доли «выгорают» в белое
@@ -41,6 +41,8 @@ function buildPoints(meta, positions, classes) {
   const geometry = new THREE.BufferGeometry();
   geometry.setAttribute("position", new THREE.BufferAttribute(positions, 3));
   geometry.setAttribute("aClass", new THREE.BufferAttribute(classes, 1));
+  // Внутренний номер нейрона = номер точки; по нему сервер отвечает на вопросы про нейрон.
+  geometry.setAttribute("aId", new THREE.BufferAttribute(Float32Array.from({ length: classes.length }, (_, i) => i), 1));
   // Границы известны заранее; без этого three.js считал бы их по всем точкам.
   const [cx, cy, cz] = meta.center;
   geometry.boundingSphere = new THREE.Sphere(new THREE.Vector3(cx, cy, cz), meta.radius * 1.05);
@@ -96,8 +98,9 @@ function buildPoints(meta, positions, classes) {
 
   const points = new THREE.Points(geometry, material);
   points.frustumCulled = false;
-  points.position.set(-cx, -cy, -cz); // мозг в начале координат: камера вращается вокруг его середины
-  return { points, material };
+  const offset = new THREE.Vector3(-cx, -cy, -cz); // мозг в начале координат: камера вращается вокруг его середины
+  points.position.copy(offset);
+  return { points, material, geometry, offset };
 }
 
 function buildLegend(meta) {
@@ -123,6 +126,12 @@ function buildLegend(meta) {
   document.getElementById("legend").hidden = false;
 }
 
+
+// Цвета колец и линий (в цветах экрана). Линии: синие — входы, оранжевые — выходы.
+const COLOR = { hover: 0xffffff, pinned: 0x5ff0ff, search: 0xffc247, input: 0x4fc3ff, output: 0xff9a3d };
+const CLICK_MAX_MOVE_PX = 5; // сдвиг мыши больше этого — это вращение, а не щелчок
+const FLIGHT_MS = 900;
+
 function start({ meta, positions, classes }) {
   const canvas = document.getElementById("scene");
   const renderer = new THREE.WebGLRenderer({ canvas, antialias: false, alpha: false });
@@ -136,8 +145,22 @@ function start({ meta, positions, classes }) {
   const distance = meta.radius * 3.1;
   camera.position.set(distance * 0.28, -distance * 0.22, -distance * 0.93);
 
-  const { points, material } = buildPoints(meta, positions, classes);
+  const { points, material, geometry, offset } = buildPoints(meta, positions, classes);
   scene.add(points);
+  const picker = createPicker(geometry, offset);
+
+  // Кольца и линии лежат в тех же координатах, что и облако.
+  const hoverRing = createRings({ color: COLOR.hover, sizePx: 22, alpha: 0.9 });
+  const pinnedRing = createRings({ color: COLOR.pinned, sizePx: 32 });
+  const searchRings = createRings({ color: COLOR.search, sizePx: 18, alpha: 0.9 });
+  const inputRings = createRings({ color: COLOR.input, sizePx: 14, alpha: 0.85 });
+  const outputRings = createRings({ color: COLOR.output, sizePx: 14, alpha: 0.85 });
+  const links = createLinks();
+  const rings = [hoverRing, pinnedRing, searchRings, inputRings, outputRings];
+  for (const layer of [links, ...rings]) {
+    layer.object.position.copy(offset);
+    scene.add(layer.object);
+  }
 
   const controls = new OrbitControls(camera, canvas);
   controls.enableDamping = true;
@@ -145,9 +168,177 @@ function start({ meta, positions, classes }) {
   controls.rotateSpeed = 0.7;
   controls.minDistance = 20;
   controls.maxDistance = meta.radius * 8;
-  controls.autoRotate = true; // медленно крутится, пока вы не взяли мышь
   controls.autoRotateSpeed = 0.8;
-  controls.addEventListener("start", () => { controls.autoRotate = false; });
+
+  const tooltipElement = document.getElementById("tooltip");
+  const tooltip = createTooltip(tooltipElement);
+  const card = createCard(document.getElementById("card"), { onClose: () => unpin(), onSelect: (index) => pin(index) });
+
+  let autoRotateWanted = true; // медленно крутится, пока вы не взяли мышь
+  let hovered = -1;
+  let pinned = -1;
+  let searchActive = false;
+  let flight = null;
+  let pickDirty = false;
+  let dragging = false;
+  let pressedAt = null;
+  const mouse = { x: 0, y: 0, inside: false };
+
+  const pointOf = (index) => [positions[index * 3], positions[index * 3 + 1], positions[index * 3 + 2]];
+  const flat = (indices) => indices.flatMap(pointOf);
+
+  // ---------- наведение ----------
+  function setHovered(index) {
+    if (index === hovered) return;
+    hovered = index;
+    canvas.style.cursor = index >= 0 ? "pointer" : "";
+    hoverRing.set(index >= 0 && index !== pinned ? pointOf(index) : []);
+    if (index < 0) {
+      tooltip.hide();
+      return;
+    }
+    getInfo(index).then((info) => {
+      if (hovered === index && !dragging && index !== pinned) tooltip.show(info, mouse.x, mouse.y);
+    }).catch(() => {});
+  }
+
+  // ---------- закрепление ----------
+  async function pin(index) {
+    pinned = index;
+    hoverRing.set([]);
+    tooltip.hide();
+    pinnedRing.set(pointOf(index));
+    inputRings.set([]);
+    outputRings.set([]);
+    links.set([]);
+    try {
+      const info = await getInfo(index);
+      if (pinned !== index) return;
+      card.showInfo(info);
+      const connections = await getLinks(index);
+      if (pinned !== index) return;
+      card.showLinks(connections);
+      drawLinks(index, connections);
+    } catch (error) {
+      card.showError(error.message);
+    }
+  }
+
+  function drawLinks(index, connections) {
+    const strongest = Math.max(1, ...connections.inputs.map((p) => p.synapses), ...connections.outputs.map((p) => p.synapses));
+    const centre = pointOf(index);
+    const lines = [];
+    const make = (partners, color, toCentre) => {
+      const shown = partners.filter((partner) => partner.visible);
+      for (const partner of shown) {
+        const other = pointOf(partner.index);
+        lines.push({
+          from: toCentre ? other : centre,
+          to: toCentre ? centre : other,
+          color: new THREE.Color(color),
+          strength: partner.synapses / strongest,
+        });
+      }
+      return flat(shown.map((partner) => partner.index));
+    };
+    inputRings.set(make(connections.inputs, COLOR.input, true));
+    outputRings.set(make(connections.outputs, COLOR.output, false));
+    links.set(lines);
+  }
+
+  function unpin() {
+    pinned = -1;
+    pinnedRing.set([]);
+    inputRings.set([]);
+    outputRings.set([]);
+    links.set([]);
+    card.hide();
+    pickDirty = true; // под курсором снова может оказаться нейрон
+  }
+
+  // ---------- поиск и полёт камеры ----------
+  function flyToNeurons(indices) {
+    const sum = [0, 0, 0];
+    for (const index of indices) pointOf(index).forEach((value, axis) => { sum[axis] += value; });
+    const centre = sum.map((value) => value / indices.length);
+    let spread = 0;
+    for (const index of indices) {
+      const [x, y, z] = pointOf(index);
+      spread = Math.max(spread, Math.hypot(x - centre[0], y - centre[1], z - centre[2]));
+    }
+    const toTarget = new THREE.Vector3(...centre).add(offset);
+    const toDistance = Math.min(Math.max(spread * 2.6, 70), controls.maxDistance);
+    const direction = camera.position.clone().sub(controls.target).normalize();
+    flight = {
+      start: performance.now(),
+      fromTarget: controls.target.clone(),
+      toTarget,
+      fromPosition: camera.position.clone(),
+      toPosition: toTarget.clone().addScaledVector(direction, toDistance),
+    };
+    autoRotateWanted = false;
+  }
+
+  function stepFlight() {
+    if (!flight) return;
+    const progress = Math.min((performance.now() - flight.start) / FLIGHT_MS, 1);
+    const eased = progress < 0.5 ? 4 * progress ** 3 : 1 - (-2 * progress + 2) ** 3 / 2;
+    controls.target.lerpVectors(flight.fromTarget, flight.toTarget, eased);
+    camera.position.lerpVectors(flight.fromPosition, flight.toPosition, eased);
+    if (progress >= 1) flight = null;
+  }
+
+  createSearch({
+    input: document.getElementById("search-input"),
+    status: document.getElementById("search-status"),
+    clearButton: document.getElementById("search-clear"),
+    onResult(result) {
+      searchActive = true;
+      searchRings.set(flat(result.indices));
+      flyToNeurons(result.indices);
+    },
+    onClear() {
+      searchActive = false;
+      searchRings.set([]);
+    },
+  });
+
+  // ---------- мышь и клавиши ----------
+  controls.addEventListener("start", () => {
+    autoRotateWanted = false;
+    flight = null;
+  });
+  controls.addEventListener("change", () => { pickDirty = true; });
+
+  canvas.addEventListener("pointermove", (event) => {
+    mouse.x = event.clientX;
+    mouse.y = event.clientY;
+    mouse.inside = true;
+    pickDirty = true;
+    if (hovered >= 0 && !tooltipElement.hidden) tooltip.moveTo(mouse.x, mouse.y);
+  });
+  canvas.addEventListener("pointerleave", () => {
+    mouse.inside = false;
+    setHovered(-1);
+  });
+  canvas.addEventListener("pointerdown", (event) => {
+    pressedAt = { x: event.clientX, y: event.clientY };
+    dragging = true;
+    tooltip.hide();
+  });
+  canvas.addEventListener("pointerup", (event) => {
+    dragging = false;
+    pickDirty = true;
+    const wasClick = pressedAt && event.button === 0 &&
+      Math.hypot(event.clientX - pressedAt.x, event.clientY - pressedAt.y) <= CLICK_MAX_MOVE_PX;
+    pressedAt = null;
+    if (!wasClick) return;
+    if (hovered >= 0) pin(hovered);
+    else if (pinned >= 0) unpin();
+  });
+  window.addEventListener("keydown", (event) => {
+    if (event.key === "Escape" && pinned >= 0 && document.activeElement?.tagName !== "INPUT") unpin();
+  });
 
   function resize() {
     const pixelRatio = Math.min(window.devicePixelRatio || 1, 2);
@@ -158,18 +349,28 @@ function start({ meta, positions, classes }) {
     material.uniforms.uViewportHeight.value = window.innerHeight * pixelRatio;
     material.uniforms.uMinPx.value = MIN_POINT_PX * pixelRatio;
     material.uniforms.uMaxPx.value = MAX_POINT_PX * pixelRatio;
+    picker.resize(window.innerWidth, window.innerHeight);
+    for (const layer of rings) layer.setPixelRatio(pixelRatio);
+    pickDirty = true;
   }
   window.addEventListener("resize", resize);
   resize();
 
   renderer.setAnimationLoop(() => {
+    stepFlight();
+    controls.autoRotate = autoRotateWanted && hovered < 0 && pinned < 0 && !searchActive;
     controls.update();
+    if (pickDirty && mouse.inside && !dragging) {
+      pickDirty = false;
+      setHovered(picker.pick(renderer, camera, mouse.x, mouse.y));
+    }
     renderer.render(scene, camera);
   });
 
   buildLegend(meta);
   statusEl.textContent = `Показано нейронов: ${formatInt(meta.shown)} из ${formatInt(meta.total)}`;
-  window.flybrain = { camera, controls, renderer, scene }; // для отладки в консоли браузера
+  document.getElementById("search").hidden = false;
+  window.flybrain = { camera, controls, renderer, scene, picker, pin, unpin }; // для отладки в консоли браузера
 }
 
 loadData().then(start).catch((error) => showError(`Ошибка: ${error.message}`));

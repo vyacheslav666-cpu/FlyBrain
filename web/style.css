@@ -80,3 +80,114 @@ html, body {
   font-size: 14px;
   line-height: 1.5;
 }
+
+/* ---------- поиск ---------- */
+#search {
+  position: fixed;
+  top: 14px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: min(420px, calc(100vw - 40px));
+}
+.search-box { position: relative; }
+#search-input {
+  width: 100%;
+  padding: 9px 34px 9px 14px;
+  background: var(--panel);
+  color: var(--text);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 20px;
+  backdrop-filter: blur(6px);
+  font: inherit;
+  font-size: 14px;
+  outline: none;
+}
+#search-input:focus { border-color: #5ff0ff; }
+#search-input::placeholder { color: var(--muted); }
+#search-input::-webkit-search-cancel-button { display: none; }
+#search-clear {
+  position: absolute;
+  top: 50%;
+  right: 8px;
+  transform: translateY(-50%);
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--muted);
+  font-size: 18px;
+  line-height: 1;
+  cursor: pointer;
+}
+#search-clear:hover { color: var(--text); }
+#search-status {
+  width: fit-content;
+  max-width: 100%;
+  margin: 6px auto 0;
+  padding: 3px 10px;
+  background: var(--panel);
+  border-radius: 10px;
+  color: var(--text);
+  font-size: 12px;
+  line-height: 1.4;
+  text-align: center;
+}
+#search-status:empty { display: none; }
+
+/* ---------- подсказка и карточка нейрона ---------- */
+#tooltip, #card {
+  position: fixed;
+  background: rgba(12, 16, 26, 0.92);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 10px;
+  backdrop-filter: blur(6px);
+  font-size: 13px;
+  line-height: 1.4;
+}
+#tooltip { z-index: 5; max-width: 340px; padding: 10px 12px; pointer-events: none; }
+#card {
+  top: 70px;
+  right: 20px;
+  width: 340px;
+  max-height: calc(100vh - 100px);
+  overflow-y: auto;
+  padding: 12px 14px;
+  border-color: rgba(95, 240, 255, 0.5);
+}
+.neuron-head { display: flex; flex-direction: column; gap: 2px; margin-bottom: 8px; padding-right: 18px; }
+.neuron-label { font-size: 16px; }
+.neuron-about { color: var(--muted); font-size: 12px; }
+.neuron-rows { display: grid; grid-template-columns: auto 1fr; gap: 3px 12px; margin: 0; }
+.neuron-rows dt { color: var(--muted); }
+.neuron-rows dd { margin: 0; text-align: right; }
+.neuron-rows .mono { font-family: Consolas, monospace; font-size: 12px; }
+.sign-plus { color: #7ee787; }
+.sign-minus { color: #ff8b8b; }
+.card-close {
+  position: absolute;
+  top: 6px;
+  right: 8px;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--muted);
+  font-size: 20px;
+  cursor: pointer;
+}
+.card-close:hover { color: var(--text); }
+.card-loading, .card-hint { margin: 10px 0 0; color: var(--muted); font-size: 12px; }
+.partners { margin-top: 10px; }
+.partners h3 { margin: 0 0 4px; font-size: 12px; font-weight: 600; letter-spacing: 0.04em; }
+.partners-in h3 { color: #4fc3ff; }
+.partners-out h3 { color: #ff9a3d; }
+.partners ol { list-style: none; margin: 0; padding: 0; }
+.partners li { display: flex; justify-content: space-between; gap: 10px; padding: 1px 0; }
+.partner-label { padding: 0; border: 0; background: none; color: var(--text); font: inherit; text-align: left; }
+button.partner-label { cursor: pointer; }
+button.partner-label:hover { text-decoration: underline; }
+span.partner-label { color: var(--muted); }
+.partner-strength { color: var(--muted); font-variant-numeric: tabular-nums; }

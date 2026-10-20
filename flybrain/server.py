@@ -8,11 +8,12 @@ import urllib.request
 import webbrowser
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException, Query
 from fastapi.responses import FileResponse, JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
 
 from flybrain import processed, webdata
+from flybrain.lookup import NeuronLookup
 from flybrain.paths import PROCESSED_DIR, PROJECT_ROOT
 
 WEB_DIR = PROJECT_ROOT / "web"
@@ -34,6 +35,7 @@ def create_app(processed_dir=PROCESSED_DIR, web_dir=WEB_DIR) -> FastAPI:
         names = webdata.load_yaml(webdata.NAMES_FILE)
         state["cloud"] = webdata.build_cloud_gzip(neurons, legend)
         state["meta"] = webdata.build_meta(neurons, legend, names)
+        state["lookup"] = NeuronLookup(neurons, processed.load_connectivity(processed_dir), names, legend)
         yield
 
     app = FastAPI(title="FlyBrain", lifespan=lifespan)
@@ -58,6 +60,24 @@ def create_app(processed_dir=PROCESSED_DIR, web_dir=WEB_DIR) -> FastAPI:
             media_type="application/octet-stream",
             headers={"Content-Encoding": "gzip", "Cache-Control": "no-cache"},
         )
+
+    def known_neuron(index: int) -> NeuronLookup:
+        lookup = state["lookup"]
+        if not 0 <= index < len(lookup.neurons):
+            raise HTTPException(status_code=404, detail="нет нейрона с таким номером")
+        return lookup
+
+    @app.get("/api/neuron/{index}")
+    def neuron(index: int) -> JSONResponse:
+        return JSONResponse(known_neuron(index).info(index), headers={"Cache-Control": "no-cache"})
+
+    @app.get("/api/neuron/{index}/links")
+    def neuron_links(index: int) -> JSONResponse:
+        return JSONResponse(known_neuron(index).links(index), headers={"Cache-Control": "no-cache"})
+
+    @app.get("/api/search")
+    def search(q: str = Query(max_length=100)) -> JSONResponse:
+        return JSONResponse(state["lookup"].search(q), headers={"Cache-Control": "no-cache"})
 
     app.mount("/web", StaticFiles(directory=web_dir), name="web")
     return app
