@@ -1,0 +1,53 @@
+# Эталонные прогоны оригинального кода Shiu на Brian2 (коммит C4, D-006, D-029).
+# Каждое условие — `trials` повторов по `duration_ms`. Группы нейронов — из data/processed/groups.json (C3).
+# `excite` — частота пуассоновских импульсов r_poi у Shiu, `excite2` — вторая частота r_poi2.
+# Сами параметры модели не задаются здесь: берутся как есть из default_params в model.py (D-005).
+
+trials: 30
+duration_ms: 1000
+# Зерно случайных чисел для перемешанных связей (контроль Б7). Любое число; записано, чтобы контроль повторялся.
+shuffle_seed: 783
+
+conditions:
+  - key: sugar_10hz
+    name_ru: сахар 10 Гц
+    excite: {group: sugar, hz: 10}
+  - key: sugar_50hz
+    name_ru: сахар 50 Гц
+    excite: {group: sugar, hz: 50}
+  - key: sugar_100hz
+    name_ru: сахар 100 Гц
+    excite: {group: sugar, hz: 100}
+  - key: sugar_200hz
+    name_ru: сахар 200 Гц
+    excite: {group: sugar, hz: 200}
+  - key: sugar_100hz_bitter_200hz
+    name_ru: сахар 100 + горечь 200 Гц
+    excite: {group: sugar, hz: 100}
+    excite2: {group: bitter, hz: 200}
+  - key: water_100hz
+    name_ru: вода 100 Гц
+    excite: {group: water, hz: 100}
+  - key: antenna_100hz
+    name_ru: все JON 100 Гц
+    excite: {group: antenna, hz: 100}
+  - key: jon_ce_100hz
+    name_ru: JO-CE 100 Гц
+    excite: {group: jon_ce, hz: 100}
+  - key: jon_f_100hz
+    name_ru: JO-F 100 Гц
+    excite: {group: jon_f, hz: 100}
+  - key: shadow_left_100hz
+    name_ru: тень слева 100 Гц ⚗
+    excite: {group: shadow_left, hz: 100}
+    honesty_ru: эксперимент вне статьи Shiu (D-013)
+  - key: sugar_100hz_shuffled
+    name_ru: сахар 100 Гц, связи перемешаны
+    excite: {group: sugar, hz: 100}
+    connectivity: shuffled
+    honesty_ru: >-
+      способ перемешивания — наш выбор (у Shiu он не записан): получатели всех связей переставлены
+      случайно; у каждого нейрона сохранены число входов, число выходов и веса выходов (D-029)
+
+# Нейроны для итоговой таблицы (группы readouts из groups.json; столбцы — по сторонам мухи, D-011).
+summary_readouts: [MN9, aDN1, aDN2, aBN1, GF]
