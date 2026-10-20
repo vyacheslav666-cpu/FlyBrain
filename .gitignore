@@ -1,0 +1,27 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+.venv-*/
+.pytest_cache/
+.ruff_cache/
+
+# Data and results: downloaded or generated, never committed (docs/DECISIONS.md, D-009)
+data/raw/
+data/processed/
+data/reference/
+data/cache/
+results/
+
+# Research-phase scratch: throwaway scripts, clones, measurements (D-022)
+.research/
+
+# Media and OS
+*.mp4
+Thumbs.db
+desktop.ini
+.DS_Store
+
+# Editors
+.vscode/
+.idea/
