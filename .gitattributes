@@ -3,3 +3,5 @@
 *.ps1 text eol=crlf
 *.png binary
 *.parquet binary
+# Чужие файлы three.js лежат как есть: git не меняет в них переводы строк (иначе сломается контрольная сумма).
+web/vendor/* -text

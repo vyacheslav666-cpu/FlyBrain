@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>FlyBrain — мозг мухи</title>
+  <link rel="stylesheet" href="/web/style.css">
+  <script type="importmap">
+    { "imports": { "three": "/web/vendor/three.module.js" } }
+  </script>
+</head>
+<body>
+  <canvas id="scene"></canvas>
+
+  <header id="title">
+    <h1>FlyBrain</h1>
+    <p id="status">Загрузка нейронов…</p>
+  </header>
+
+  <aside id="legend" hidden>
+    <h2>Классы нейронов</h2>
+    <ul id="legend-list"></ul>
+    <p id="legend-note"></p>
+  </aside>
+
+  <footer id="help">
+    <p>Левая кнопка мыши — вращать, колесо — приблизить, правая кнопка — сдвинуть.
+    Вид спереди: муха смотрит на вас, её левая сторона — справа на экране.</p>
+    <p class="credits">Данные: коннектом мозга взрослой дрозофилы FlyWire (Dorkenwald et al. 2024;
+    Schlegel et al. 2024), лицензия CC&nbsp;BY&nbsp;4.0.</p>
+  </footer>
+
+  <div id="error" hidden></div>
+  <script type="module" src="/web/main.js"></script>
+</body>
+</html>

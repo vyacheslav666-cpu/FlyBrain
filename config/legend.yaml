@@ -1,0 +1,14 @@
+# Порядок и цвета крупных классов нейронов в 3D-облаке (коммит C7, D-026).
+# Русские названия берутся из names_ru.yaml (раздел super_classes).
+# Порядок — это и номер класса в двоичных данных для браузера; не больше 16 классов.
+classes:
+  - {key: optic, color: "#4f8dff"}
+  - {key: central, color: "#ffb347"}
+  - {key: sensory, color: "#5be37d"}
+  - {key: visual_projection, color: "#b57bff"}
+  - {key: visual_centrifugal, color: "#ff6ec7"}
+  - {key: ascending, color: "#2dd4bf"}
+  - {key: sensory_ascending, color: "#d4f542"}
+  - {key: descending, color: "#ff5a5f"}
+  - {key: motor, color: "#ffe14d"}
+  - {key: endocrine, color: "#ffffff"}

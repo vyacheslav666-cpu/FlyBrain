@@ -26,6 +26,9 @@ def main(argv: list[str] | None = None) -> int:
     subparsers.add_parser(
         "build-data", help="собрать таблицу нейронов, матрицу связей, группы и картинку в data/processed/"
     )
+    serve = subparsers.add_parser("serve", help="запустить сервер и открыть 3D-облако нейронов в браузере")
+    serve.add_argument("--port", type=int, default=8765, help="порт сервера (по умолчанию 8765)")
+    serve.add_argument("--no-browser", action="store_true", help="не открывать браузер автоматически")
 
     args = parser.parse_args(argv)
     if args.command == "doctor":
@@ -40,5 +43,9 @@ def main(argv: list[str] | None = None) -> int:
         from flybrain.build import run_build_data
 
         return run_build_data()
+    if args.command == "serve":
+        from flybrain.server import run_serve
+
+        return run_serve(port=args.port, open_browser=not args.no_browser)
     parser.print_help()
     return 0
