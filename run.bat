@@ -6,7 +6,8 @@ set PYTHONUTF8=1
 cd /d "%~dp0"
 where uv >nul 2>nul
 if errorlevel 1 goto no_uv
-uv run flybrain serve
+rem "python -m" instead of the flybrain.exe launcher: a running flybrain.exe would block uv from reinstalling the project.
+uv run python -m flybrain serve
 goto done
 
 :no_uv

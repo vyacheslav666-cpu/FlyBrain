@@ -82,7 +82,7 @@ needs_data = pytest.mark.skipif(
 @needs_data
 def test_server_serves_page_data_and_scripts():
     with TestClient(create_app()) as client:
-        assert client.get("/api/ping").json() == {"app": "flybrain"}
+        assert client.get("/api/ping").json()["app"] == "flybrain"
         page = client.get("/")
         assert page.status_code == 200 and "FlyBrain" in page.text
 

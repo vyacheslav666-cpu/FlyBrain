@@ -1,5 +1,6 @@
 """`flybrain serve`: сервер страницы и данных нейронов (FastAPI, коммит C7, D-015)."""
 
+import json
 import mimetypes
 import sys
 import threading
@@ -15,11 +16,15 @@ from fastapi.staticfiles import StaticFiles
 from flybrain import processed, webdata
 from flybrain.lookup import NeuronLookup
 from flybrain.paths import PROCESSED_DIR, PROJECT_ROOT
+from flybrain.serverctl import stop_old_server
+from flybrain.version import code_version
 
 WEB_DIR = PROJECT_ROOT / "web"
 HOST = "127.0.0.1"  # только эта машина: наружу сервер не открываем
 DEFAULT_PORT = 8765
 PING_ANSWER = "flybrain"
+# Версия кода, который этот процесс прочитал при запуске (D-028). Считаем один раз: если файлы потом изменятся, сервер станет «устаревшим».
+CODE_VERSION = code_version()
 
 # Модули в браузере должны приходить как JavaScript. На Windows тип берётся из реестра и бывает неверным.
 mimetypes.add_type("text/javascript", ".js")
@@ -46,7 +51,7 @@ def create_app(processed_dir=PROCESSED_DIR, web_dir=WEB_DIR) -> FastAPI:
 
     @app.get("/api/ping")
     def ping() -> dict:
-        return {"app": PING_ANSWER}
+        return {"app": PING_ANSWER, "version": CODE_VERSION}
 
     @app.get("/api/meta")
     def meta() -> JSONResponse:
@@ -83,12 +88,14 @@ def create_app(processed_dir=PROCESSED_DIR, web_dir=WEB_DIR) -> FastAPI:
     return app
 
 
-def _our_server_answers(port: int) -> bool:
+def _ping(port: int) -> dict | None:
+    """Ответ нашего сервера на `/api/ping` или `None`, если порт молчит или отвечает кто-то другой."""
     try:
         with urllib.request.urlopen(f"http://{HOST}:{port}/api/ping", timeout=1) as answer:
-            return PING_ANSWER.encode() in answer.read()
-    except OSError:
-        return False
+            data = json.loads(answer.read())
+    except (OSError, ValueError):
+        return None
+    return data if isinstance(data, dict) and data.get("app") == PING_ANSWER else None
 
 
 def _port_is_busy(port: int) -> bool:
@@ -101,7 +108,8 @@ def _port_is_busy(port: int) -> bool:
 def _open_browser_when_ready(port: int) -> None:
     url = f"http://{HOST}:{port}/"
     for _ in range(300):  # до 30 секунд: сервер сначала готовит данные
-        if _our_server_answers(port):
+        answer = _ping(port)
+        if answer is not None and answer.get("version") == CODE_VERSION:
             webbrowser.open(url)
             return
         time.sleep(0.1)
@@ -114,14 +122,25 @@ def run_serve(port: int = DEFAULT_PORT, open_browser: bool = True) -> int:
         return 1
     url = f"http://{HOST}:{port}/"
     if _port_is_busy(port):
-        if _our_server_answers(port):
+        answer = _ping(port)
+        if answer is None:
+            print(f"[ОШИБКА] порт {port} занят другой программой. Попробуйте: uv run flybrain serve --port 8766",
+                  file=sys.stderr)
+            return 1
+        if answer.get("version") == CODE_VERSION:
             print(f"FlyBrain уже запущен: {url}")
             if open_browser:
                 webbrowser.open(url)
             return 0
-        print(f"[ОШИБКА] порт {port} занят другой программой. Попробуйте: uv run flybrain serve --port 8766",
-              file=sys.stderr)
-        return 1
+        # Тот же адрес, но сервер собран из другого кода (например, запущен до последнего коммита): заменяем.
+        print(f"На порту {port} работает устаревшая копия FlyBrain "
+              f"(версия кода {answer.get('version') or 'неизвестна'}, нужна {CODE_VERSION}). Останавливаю её…")
+        result = stop_old_server(port, port_is_busy=lambda: _port_is_busy(port))
+        if not result.ok:
+            print(f"[ОШИБКА] {result.message}. Закройте окно старого сервера вручную и запустите снова.",
+                  file=sys.stderr)
+            return 1
+        print("Старая копия остановлена.")
 
     import uvicorn
 
