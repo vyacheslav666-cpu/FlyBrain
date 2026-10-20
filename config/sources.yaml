@@ -1,0 +1,39 @@
+# Откуда скачиваются данные и чужой код (docs/DATA.md, D-009).
+# Всё закреплено коммитом и проверяется по SHA-256. Если сумма не совпала — команда останавливается.
+# Суммы считаются от байтов, которые реально отдаёт GitHub (с переводами строк LF), см. D-024.
+
+files:
+  - name: Completeness_783.csv
+    description: список 138 639 нейронов модели (порядок строк важен)
+    url: https://raw.githubusercontent.com/philshiu/Drosophila_brain_model/91bdd1e7dcf193f3e7ca5a8933497fcef63b7960/Completeness_783.csv
+    sha256: bbb847a4cc2caaa7a16349722d220c087317b946d148d4d592d94d250617a311
+    size_bytes: 3327347
+    dest: data/raw/shiu/Completeness_783.csv
+
+  - name: Connectivity_783.parquet
+    description: связи нейрон → нейрон со знаком (15 091 983 пары)
+    url: https://raw.githubusercontent.com/philshiu/Drosophila_brain_model/91bdd1e7dcf193f3e7ca5a8933497fcef63b7960/Connectivity_783.parquet
+    sha256: efeb23fb99098e9c390f6869969b2a121a2ee92c833cfc45ecb2c1d8e1af0347
+    size_bytes: 100804642
+    dest: data/raw/shiu/Connectivity_783.parquet
+
+  - name: model.py
+    description: эталонный код модели Shiu на Brian2 (MIT), не изменяется
+    url: https://raw.githubusercontent.com/philshiu/Drosophila_brain_model/91bdd1e7dcf193f3e7ca5a8933497fcef63b7960/model.py
+    sha256: fc45837d7122c6ce2a7f3f2f23c515992e4b232aadb919efabb72337fac88e4e
+    size_bytes: 10000
+    dest: data/raw/shiu/model.py
+
+  - name: utils.py
+    description: вспомогательный код Shiu (MIT), не изменяется
+    url: https://raw.githubusercontent.com/philshiu/Drosophila_brain_model/91bdd1e7dcf193f3e7ca5a8933497fcef63b7960/utils.py
+    sha256: f378cf0b464f2ac5e1daf3609ba25fd51c7e34f294846281707ffe006c3e9ef1
+    size_bytes: 10000
+    dest: data/raw/shiu/utils.py
+
+  - name: Supplemental_file1_neuron_annotations.tsv
+    description: таблица аннотаций FlyWire (класс, тип, сторона, координаты), Schlegel et al. 2024
+    url: https://raw.githubusercontent.com/flyconnectome/flywire_annotations/a83b2776d60d5764cef36b927f5f9679c16c47a2/supplemental_files/Supplemental_file1_neuron_annotations.tsv
+    sha256: b214970b55d2fbe0853bba536fdcb9e28730f4eb7ab06f600491df795da683cd
+    size_bytes: 31720298
+    dest: data/raw/flywire/Supplemental_file1_neuron_annotations.tsv

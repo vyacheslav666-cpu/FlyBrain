@@ -10,7 +10,7 @@ import tempfile
 from dataclasses import dataclass
 from pathlib import Path
 
-PROJECT_ROOT = Path(__file__).resolve().parent.parent
+from flybrain.paths import PROJECT_ROOT
 
 OK = "OK"
 WARN = "ВНИМАНИЕ"

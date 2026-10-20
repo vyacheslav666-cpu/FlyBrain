@@ -22,11 +22,16 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--version", action="version", version=f"flybrain {__version__}")
     subparsers = parser.add_subparsers(dest="command", metavar="команда")
     subparsers.add_parser("doctor", help="проверить, что машина готова к работе")
+    subparsers.add_parser("fetch-data", help="скачать данные в data/raw/ и сверить контрольные суммы")
 
     args = parser.parse_args(argv)
     if args.command == "doctor":
         from flybrain.doctor import run_doctor
 
         return run_doctor()
+    if args.command == "fetch-data":
+        from flybrain.fetch import run_fetch_data
+
+        return run_fetch_data()
     parser.print_help()
     return 0

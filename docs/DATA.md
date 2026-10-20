@@ -1,14 +1,14 @@
 # Данные: откуда, в каком виде, на каких условиях
 
-Ни один из этих файлов не хранится в git. В коммите C2 появится скрипт, который скачает их в `data/raw/` и сверит контрольные суммы (SHA-256) с таблицей ниже. Если сумма не совпала, значит файл изменился у автора, и скрипт остановится, а не продолжит молча.
+Ни один из этих файлов не хранится в git. Команда `flybrain fetch-data` (коммит C2) скачивает их в `data/raw/` и сверит контрольные суммы (SHA-256) с таблицей ниже. Если сумма не совпала, значит файл изменился у автора, и команда остановится, а не продолжит молча. Адреса и суммы лежат в `config/sources.yaml`. Суммы текстовых файлов посчитаны от байтов, которые отдаёт GitHub, — см. D-024.
 
 ## 1. Обязательные файлы для M1
 
 | Файл | Откуда | Размер | SHA-256 | Лицензия |
 |---|---|---|---|---|
-| `Completeness_783.csv` | github.com/philshiu/Drosophila_brain_model, коммит `91bdd1e7dcf193f3e7ca5a8933497fcef63b7960` | 3,5 МБ | `52B0AC6094CD32C546F8D4C341E094376F48F4E791F8DB9B166DE5DFF8199EA4` | файл в репозитории под MIT; сами данные — FlyWire, CC BY 4.0 |
+| `Completeness_783.csv` | github.com/philshiu/Drosophila_brain_model, коммит `91bdd1e7dcf193f3e7ca5a8933497fcef63b7960` | 3,3 МБ | `BBB847A4CC2CAAA7A16349722D220C087317B946D148D4D592D94D250617A311` | файл в репозитории под MIT; сами данные — FlyWire, CC BY 4.0 |
 | `Connectivity_783.parquet` | там же | 100,8 МБ | `EFEB23FB99098E9C390F6869969B2A121A2EE92C833CFC45ECB2C1D8E1AF0347` | то же |
-| `model.py`, `utils.py` (эталонный код) | там же | < 20 КБ | сверяется по коммиту | MIT |
+| `model.py`, `utils.py` (эталонный код) | там же | 12 КБ и 2 КБ | `model.py`: `FC45837D7122C6CE2A7F3F2F23C515992E4B232AADB919EFABB72337FAC88E4E`; `utils.py`: `F378CF0B464F2AC5E1DAF3609BA25FD51C7E34F294846281707FFE006C3E9EF1` | MIT |
 | `Supplemental_file1_neuron_annotations.tsv` | github.com/flyconnectome/flywire_annotations, коммит `a83b2776d60d5764cef36b927f5f9679c16c47a2`, папка `supplemental_files/` | 31,7 МБ | `B214970B55D2FBE0853BBA536FDCB9E28730F4EB7AB06F600491DF795DA683CD` | приложение к Schlegel et al., Nature 2024 (открытый доступ, CC BY 4.0); файла LICENSE в репозитории нет — поэтому не распространяем |
 
 ### 1.1. `Completeness_783.csv` — список нейронов модели
