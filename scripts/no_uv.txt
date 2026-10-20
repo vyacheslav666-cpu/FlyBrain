@@ -1,0 +1,6 @@
+Не найден uv (менеджер Python и библиотек).
+Откройте PowerShell и выполните:
+
+    winget install --id=astral-sh.uv -e
+
+Затем закройте PowerShell и запустите run.bat снова.

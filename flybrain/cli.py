@@ -1,0 +1,32 @@
+"""Консольная команда `flybrain` и её подкоманды."""
+
+import argparse
+import sys
+
+from flybrain import __version__
+
+
+def _use_utf8_output() -> None:
+    # Системная кодировка здесь cp1251; вывод в файл или по трубе всегда делаем в UTF-8 (D-021).
+    for stream in (sys.stdout, sys.stderr):
+        if hasattr(stream, "reconfigure"):
+            stream.reconfigure(encoding="utf-8")
+
+
+def main(argv: list[str] | None = None) -> int:
+    _use_utf8_output()
+    parser = argparse.ArgumentParser(
+        prog="flybrain",
+        description="FlyBrain: симуляция мозга дрозофилы на коннектоме FlyWire 783.",
+    )
+    parser.add_argument("--version", action="version", version=f"flybrain {__version__}")
+    subparsers = parser.add_subparsers(dest="command", metavar="команда")
+    subparsers.add_parser("doctor", help="проверить, что машина готова к работе")
+
+    args = parser.parse_args(argv)
+    if args.command == "doctor":
+        from flybrain.doctor import run_doctor
+
+        return run_doctor()
+    parser.print_help()
+    return 0
