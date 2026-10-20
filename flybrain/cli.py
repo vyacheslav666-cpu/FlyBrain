@@ -33,6 +33,17 @@ def main(argv: list[str] | None = None) -> int:
     reference.add_argument("--trials", type=int, help="повторов на условие (по умолчанию 30 — из config/reference.yaml)")
     reference.add_argument("--only", help="только эти условия, через запятую (например sugar_100hz)")
     reference.add_argument("--out", help="папка для результатов (по умолчанию data/reference)")
+    sim = subparsers.add_parser("sim", help="прогнать модель на движке PyTorch и показать самые активные нейроны")
+    sim.add_argument("--stim", required=True,
+                     help="группы-стимулы через запятую: sugar, bitter, water, ir94e, jon_ce, jon_f, jon_dm, "
+                          "antenna, shadow_left, shadow_right")
+    sim.add_argument("--hz", type=float, default=100.0, help="частота стимула, Гц (по умолчанию 100)")
+    sim.add_argument("--trials", type=int, default=30, help="повторов одновременно (по умолчанию 30)")
+    sim.add_argument("--duration-ms", type=float, default=1000.0, help="длительность повтора, мс (по умолчанию 1000)")
+    sim.add_argument("--device", choices=["auto", "cuda", "cpu"], default="auto",
+                     help="где считать: auto — видеокарта, если есть (по умолчанию)")
+    sim.add_argument("--seed", type=int, help="зерно случайных чисел (для точного повторения)")
+    sim.add_argument("--top", type=int, default=20, help="сколько самых активных нейронов показать (по умолчанию 20)")
     serve = subparsers.add_parser("serve", help="запустить сервер и открыть 3D-облако нейронов в браузере")
     serve.add_argument("--port", type=int, default=8765, help="порт сервера (по умолчанию 8765)")
     serve.add_argument("--no-browser", action="store_true", help="не открывать браузер автоматически")
@@ -58,6 +69,12 @@ def main(argv: list[str] | None = None) -> int:
         only = [key.strip() for key in args.only.split(",") if key.strip()] if args.only else None
         return run_reference(trials=args.trials, jobs=args.jobs, only=only,
                              out_dir=Path(args.out).resolve() if args.out else REFERENCE_DIR)
+    if args.command == "sim":
+        from flybrain.sim import run_sim
+
+        stimuli = [key.strip() for key in args.stim.split(",") if key.strip()]
+        return run_sim(stimuli, hz=args.hz, trials=args.trials, duration_ms=args.duration_ms,
+                       device=args.device, seed=args.seed, top=args.top)
     if args.command == "serve":
         from flybrain.server import run_serve
 
