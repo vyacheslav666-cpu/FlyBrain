@@ -28,6 +28,8 @@ def test_sources_file_is_complete():
         "Connectivity_783.parquet",
         "model.py",
         "utils.py",
+        "figures.ipynb",
+        "sez_neurons.pickle",
         "Supplemental_file1_neuron_annotations.tsv",
     } <= names
     for source in sources:

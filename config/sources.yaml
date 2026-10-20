@@ -31,6 +31,20 @@ files:
     size_bytes: 10000
     dest: data/raw/shiu/utils.py
 
+  - name: figures.ipynb
+    description: тетрадка Shiu к рисункам статьи (MIT) — исходные списки нейронов-стимулов, сверяются в build-data
+    url: https://raw.githubusercontent.com/philshiu/Drosophila_brain_model/91bdd1e7dcf193f3e7ca5a8933497fcef63b7960/figures.ipynb
+    sha256: 33cd73c0b4b4a291c51b7bab639c4fa28978e49e111ff0d6adbca5687addb84c
+    size_bytes: 33229
+    dest: data/raw/shiu/figures.ipynb
+
+  - name: sez_neurons.pickle
+    description: имена и номера нейронов подглоточной области из статьи Shiu (MIT), сверяются в build-data
+    url: https://raw.githubusercontent.com/philshiu/Drosophila_brain_model/91bdd1e7dcf193f3e7ca5a8933497fcef63b7960/sez_neurons.pickle
+    sha256: 2bc5a2a8289924f2de39a8e68bdc07025cb6d6c6c6ddc83a973c0cace7cec2ce
+    size_bytes: 5114
+    dest: data/raw/shiu/sez_neurons.pickle
+
   - name: Supplemental_file1_neuron_annotations.tsv
     description: таблица аннотаций FlyWire (класс, тип, сторона, координаты), Schlegel et al. 2024
     url: https://raw.githubusercontent.com/flyconnectome/flywire_annotations/a83b2776d60d5764cef36b927f5f9679c16c47a2/supplemental_files/Supplemental_file1_neuron_annotations.tsv

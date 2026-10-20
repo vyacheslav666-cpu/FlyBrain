@@ -1,0 +1,446 @@
+# Группы нейронов: стимулы и «исполнители» (D-012…D-014, D-025; docs/DATA.md, раздел 2).
+#
+# Состав группы задаётся одним из трёх способов:
+#   paper_ids — номера из статьи Shiu et al. 2024. Поле `paper` говорит, где именно они записаны
+#               в репозитории Shiu (коммит 91bdd1e; файл скачивает `flybrain fetch-data`).
+#               Номера там — версии FlyWire 630. У каждого номера статус:
+#                 in_783     — «из статьи, номер не менялся»: этот номер есть и в версии 783;
+#                 not_in_783 — «не найден в 783»: номер изменился. Такой нейрон не используем
+#                              и не подменяем «похожим» (D-012).
+#   select    — отбор по таблице аннотаций FlyWire (тип клетки, сторона, класс).
+#               Если у группы есть ещё и `paper_ids`, найденные номера из статьи обязаны попасть в отбор:
+#               так проверяется, что тип выбран правильно.
+#   union     — объединение других групп того же раздела.
+#
+# [ЧЕСТНОСТЬ] Всё, что выбрано не статьёй, а нами, подписано полем `honesty_ru`.
+# `flybrain build-data` сверяет списки с оригиналом статьи, а статусы — с данными 783.
+# Если хоть что-то не сходится, команда останавливается с ошибкой.
+# Комментарий после номера — тип, подкласс и сторона по нынешней таблице аннотаций (для справки).
+
+stimuli:
+  sugar:
+    name_ru: Сахар
+    about_ru: вкусовые нейроны сахара на хоботке, левая сторона мухи (список Shiu et al. 2024, рис. 1)
+    honesty_ru: >-
+      Прямое включение нейронов, а не настоящий сахар. С 2023 года классификацию уточнили:
+      по нынешней таблице из 20 найденных нейронов только 11 «сахарные» (9 sugar, 2 sugar/low_salt),
+      остальные — high_salt/heavy_metal (5) и putative_attractive (4). Список статьи используем как есть (D-012).
+    paper: {file: figures.ipynb, name: neu_sugar}
+    paper_ids:
+      - {id: 720575940624963786, status: in_783}  # LB4b, putative_attractive, left
+      - {id: 720575940630233916, status: in_783}  # LB4b, putative_attractive, left
+      - {id: 720575940637568838, status: in_783}  # LB4b, putative_attractive, left
+      - {id: 720575940638202345, status: in_783}  # LB4b, putative_attractive, left
+      - {id: 720575940617000768, status: in_783}  # LB3c, sugar, left
+      - {id: 720575940630797113, status: in_783}  # LB3d, high_salt/heavy_metal, left
+      - {id: 720575940632889389, status: in_783}  # LB3d, high_salt/heavy_metal, left
+      - {id: 720575940621754367, status: in_783}  # LB3c, sugar, left
+      - {id: 720575940621502051, status: in_783}  # LB3c, sugar, left
+      - {id: 720575940640649691, status: in_783}  # LB3c, sugar, left
+      - {id: 720575940639332736, status: in_783}  # LB3c, sugar, left
+      - {id: 720575940616885538, status: in_783}  # LB3c, sugar, left
+      - {id: 720575940639198653, status: in_783}  # LB3c, sugar, left
+      - {id: 720575940620900446, status: not_in_783}  # в 783 не найден
+      - {id: 720575940617937543, status: in_783}  # LB3b, sugar/low_salt, left
+      - {id: 720575940632425919, status: in_783}  # LB3d, high_salt/heavy_metal, left
+      - {id: 720575940633143833, status: in_783}  # LB3d, high_salt/heavy_metal, left
+      - {id: 720575940612670570, status: in_783}  # LB3c, sugar, left
+      - {id: 720575940628853239, status: in_783}  # LB3c, sugar, left
+      - {id: 720575940629176663, status: in_783}  # LB3b, sugar/low_salt, left
+      - {id: 720575940611875570, status: in_783}  # LB3d, high_salt/heavy_metal, left
+
+  bitter:
+    name_ru: Горечь
+    about_ru: вкусовые нейроны горечи на хоботке, левая сторона мухи (список Shiu et al. 2024, рис. 3)
+    honesty_ru: Прямое включение нейронов, а не настоящий горький вкус (D-012).
+    paper: {file: figures.ipynb, name: neu_bitter}
+    paper_ids:
+      - {id: 720575940621778381, status: in_783}  # LB1b, bitter, left
+      - {id: 720575940602353632, status: in_783}  # LB1d, bitter, left
+      - {id: 720575940617094208, status: in_783}  # LB1a, bitter, left
+      - {id: 720575940619197093, status: in_783}  # LB1c, bitter, left
+      - {id: 720575940626287336, status: in_783}  # LB1a, bitter, left
+      - {id: 720575940618600651, status: not_in_783}  # в 783 не найден
+      - {id: 720575940627692048, status: in_783}  # LB1a, bitter, left
+      - {id: 720575940630195909, status: in_783}  # LB1a, bitter, left
+      - {id: 720575940646212996, status: in_783}  # LB1b, bitter, left
+      - {id: 720575940610483162, status: in_783}  # LB1b, bitter, left
+      - {id: 720575940645743412, status: in_783}  # LB1c, bitter, left
+      - {id: 720575940627578156, status: in_783}  # LB1d, bitter, left
+      - {id: 720575940622298631, status: in_783}  # LB1d, bitter, left
+      - {id: 720575940621008895, status: in_783}  # LB1a, bitter, left
+      - {id: 720575940629146711, status: in_783}  # LB1c, bitter, left
+      - {id: 720575940610259370, status: in_783}  # LB1a, bitter, left
+      - {id: 720575940610481370, status: in_783}  # LB1d, bitter, left
+      - {id: 720575940619028208, status: in_783}  # LB1a, bitter, left
+      - {id: 720575940614281266, status: in_783}  # LB1d, bitter, left
+      - {id: 720575940613061118, status: in_783}  # LB1c, bitter, left
+      - {id: 720575940604027168, status: in_783}  # LB1a, bitter, left
+
+  water:
+    name_ru: Вода
+    about_ru: вкусовые нейроны воды на хоботке, левая сторона мухи (список Shiu et al. 2024, рис. 4)
+    honesty_ru: >-
+      Прямое включение нейронов, а не настоящая вода. По нынешней таблице 11 из 18 нейронов этого списка —
+      water (LB3a), а 7 — sugar (LB3c). Список статьи используем как есть (D-012, D-025).
+    paper: {file: figures.ipynb, name: neu_water}
+    paper_ids:
+      - {id: 720575940612950568, status: in_783}  # LB3c, sugar, left
+      - {id: 720575940631898285, status: in_783}  # LB3a, water, left
+      - {id: 720575940606002609, status: in_783}  # LB3c, sugar, left
+      - {id: 720575940612579053, status: in_783}  # LB3c, sugar, left
+      - {id: 720575940622902535, status: in_783}  # LB3a, water, left
+      - {id: 720575940616177458, status: in_783}  # LB3a, water, left
+      - {id: 720575940660292225, status: in_783}  # LB3a, water, left
+      - {id: 720575940622486922, status: in_783}  # LB3c, sugar, left
+      - {id: 720575940613786774, status: in_783}  # LB3a, water, left
+      - {id: 720575940629852866, status: in_783}  # LB3c, sugar, left
+      - {id: 720575940625861168, status: in_783}  # LB3c, sugar, left
+      - {id: 720575940613996959, status: in_783}  # LB3a, water, left
+      - {id: 720575940617857694, status: in_783}  # LB3a, water, left
+      - {id: 720575940644965399, status: in_783}  # LB3a, water, left
+      - {id: 720575940625203504, status: in_783}  # LB3a, water, left
+      - {id: 720575940630553415, status: in_783}  # LB3a, water, left
+      - {id: 720575940635172191, status: in_783}  # LB3c, sugar, left
+      - {id: 720575940634796536, status: in_783}  # LB3a, water, left
+
+  ir94e:
+    name_ru: Ir94e
+    about_ru: вкусовые нейроны Ir94e на хоботке, левая сторона мухи (список Shiu et al. 2024, рис. 3)
+    paper: {file: figures.ipynb, name: neu_ir94e}
+    paper_ids:
+      - {id: 720575940614211295, status: in_783}  # LB1e, glutamate, left
+      - {id: 720575940638218173, status: in_783}  # LB1e, glutamate, left
+      - {id: 720575940628832256, status: in_783}  # LB2b, putative_aversive, left
+      - {id: 720575940626016017, status: in_783}  # LB1e, glutamate, left
+      - {id: 720575940621375231, status: in_783}  # LB1e, glutamate, left
+      - {id: 720575940612920386, status: in_783}  # LB1e, glutamate, left
+      - {id: 720575940614273292, status: in_783}  # LB2c, putative_aversive, left
+      - {id: 720575940628198503, status: in_783}  # LB1e, glutamate, left
+      - {id: 720575940626241636, status: in_783}  # LB1e, glutamate, left
+      - {id: 720575940619387814, status: in_783}  # LB2b, putative_aversive, left
+      - {id: 720575940624604560, status: in_783}  # LB2a, putative_aversive, left
+      - {id: 720575940615274425, status: in_783}  # LB1e, glutamate, left
+      - {id: 720575940610683315, status: in_783}  # LB1e, glutamate, left
+      - {id: 720575940627265265, status: in_783}  # LB2a, putative_aversive, left
+      - {id: 720575940624079544, status: in_783}  # LB1e, glutamate, left
+      - {id: 720575940629211607, status: in_783}  # LB2c, putative_aversive, left
+      - {id: 720575940615089369, status: in_783}  # LB2c, putative_aversive, left
+      - {id: 720575940631082124, status: in_783}  # LB1e, glutamate, left
+
+  jon_ce:
+    name_ru: JO-CE (усик)
+    about_ru: нейроны Джонстонова органа групп C и E, левая сторона мухи (список Shiu et al. 2024, рис. 5)
+    paper: {file: figures.ipynb, name: neu_JON_CE}
+    paper_ids:
+      - {id: 720575940619341105, status: in_783}  # JO-EV3, wind_gravity, left
+      - {id: 720575940630122015, status: in_783}  # JO-EV1, wind_gravity, left
+      - {id: 720575940611061526, status: in_783}  # JO-ED2_c, wind_gravity, left
+      - {id: 720575940615848788, status: in_783}  # JO-EV1, wind_gravity, left
+      - {id: 720575940628444667, status: in_783}  # JO-ED2_a, wind_gravity, left
+      - {id: 720575940627941431, status: in_783}  # JO-ED2_b, wind_gravity, left
+      - {id: 720575940632449619, status: in_783}  # JO-EV4, wind_gravity, left
+      - {id: 720575940650244342, status: in_783}  # JO-ED2_a, wind_gravity, left
+      - {id: 720575940631866508, status: in_783}  # JO-EV3, wind_gravity, left
+      - {id: 720575940638681845, status: in_783}  # JO-EV1, wind_gravity, left
+      - {id: 720575940628978450, status: in_783}  # JO-ED2_c, wind_gravity, left
+      - {id: 720575940609522461, status: in_783}  # JO-ED2_a, wind_gravity, left
+      - {id: 720575940621442224, status: in_783}  # JO-EV3, wind_gravity, left
+      - {id: 720575940602506208, status: in_783}  # JO-EV2, wind_gravity, left
+      - {id: 720575940629022149, status: in_783}  # JO-EV1, wind_gravity, left
+      - {id: 720575940627109991, status: in_783}  # JO-ED2_c, wind_gravity, left
+      - {id: 720575940630020111, status: in_783}  # JO-EV2, wind_gravity, left
+      - {id: 720575940615986459, status: in_783}  # JO-EV3, wind_gravity, left
+      - {id: 720575940618684481, status: in_783}  # JO-ED1, wind_gravity, left
+      - {id: 720575940620382889, status: in_783}  # JO-CM, wind_gravity, left
+      - {id: 720575940630080071, status: in_783}  # JO-EV6, wind_gravity, left
+      - {id: 720575940626565455, status: in_783}  # JO-ED2_b, wind_gravity, left
+      - {id: 720575940630319671, status: in_783}  # JO-CL, wind_gravity, left
+      - {id: 720575940602720940, status: in_783}  # JO-CA1, wind_gravity, left
+      - {id: 720575940630564179, status: in_783}  # JO-EV1, wind_gravity, left
+      - {id: 720575940637632419, status: in_783}  # JO-CM, wind_gravity, left
+      - {id: 720575940615809349, status: in_783}  # JO-EV2, wind_gravity, left
+      - {id: 720575940626042149, status: in_783}  # JO-EV4, wind_gravity, left
+      - {id: 720575940637054835, status: in_783}  # JO-ED1, wind_gravity, left
+      - {id: 720575940602132509, status: in_783}  # JO-EV2, wind_gravity, left
+      - {id: 720575940614188149, status: in_783}  # JO-EV5, wind_gravity, left
+      - {id: 720575940616951124, status: in_783}  # JO-EV1, wind_gravity, left
+      - {id: 720575940628101126, status: in_783}  # JO-ED1, wind_gravity, left
+      - {id: 720575940629055721, status: in_783}  # JO-EV1, wind_gravity, left
+      - {id: 720575940616589878, status: in_783}  # JO-ED2_a, wind_gravity, left
+      - {id: 720575940622449388, status: in_783}  # JO-EV5, wind_gravity, left
+      - {id: 720575940614427195, status: in_783}  # JO-CA2, wind_gravity, left
+      - {id: 720575940625797617, status: in_783}  # JO-ED1, wind_gravity, left
+      - {id: 720575940638664437, status: in_783}  # JO-CM, wind_gravity, left
+      - {id: 720575940618467195, status: in_783}  # JO-EV3, wind_gravity, left
+      - {id: 720575940621729757, status: in_783}  # JO-EV5, wind_gravity, left
+      - {id: 720575940613971485, status: in_783}  # JO-CL, wind_gravity, left
+      - {id: 720575940627585688, status: in_783}  # JO-EV2, wind_gravity, left
+      - {id: 720575940629650997, status: in_783}  # JO-ED2_a, wind_gravity, left
+      - {id: 720575940630059847, status: in_783}  # JO-EV5, wind_gravity, left
+      - {id: 720575940608742409, status: in_783}  # JO-EV4, wind_gravity, left
+      - {id: 720575940614351477, status: in_783}  # JO-EV3, wind_gravity, left
+      - {id: 720575940633153375, status: in_783}  # JO-EV1, wind_gravity, left
+      - {id: 720575940622937528, status: in_783}  # JO-ED2_b, wind_gravity, left
+      - {id: 720575940604753437, status: in_783}  # JO-CL, wind_gravity, left
+      - {id: 720575940611783464, status: in_783}  # JO-EV3, wind_gravity, left
+      - {id: 720575940618599872, status: in_783}  # JO-ED2_c, wind_gravity, left
+      - {id: 720575940609541917, status: in_783}  # JO-ED2_b, wind_gravity, left
+      - {id: 720575940637410869, status: in_783}  # JO-EV1, wind_gravity, left
+      - {id: 720575940630070343, status: in_783}  # JO-CL, wind_gravity, left
+      - {id: 720575940621397417, status: in_783}  # JO-EV1, wind_gravity, left
+      - {id: 720575940614035485, status: in_783}  # JO-CL, wind_gravity, left
+      - {id: 720575940610018266, status: in_783}  # JO-ED2_a, wind_gravity, left
+      - {id: 720575940626307902, status: not_in_783}  # в 783 не найден
+      - {id: 720575940634634606, status: in_783}  # JO-ED2_a, wind_gravity, left
+      - {id: 720575940614060829, status: in_783}  # JO-ED1, wind_gravity, left
+      - {id: 720575940624799290, status: in_783}  # JO-ED2_b, wind_gravity, left
+      - {id: 720575940641921421, status: in_783}  # JO-ED2_b, wind_gravity, left
+      - {id: 720575940623298559, status: in_783}  # JO-CM, wind_gravity, left
+      - {id: 720575940625559358, status: in_783}  # JO-EV3, wind_gravity, left
+      - {id: 720575940629138959, status: in_783}  # JO-CA1, wind_gravity, left
+      - {id: 720575940621625597, status: in_783}  # JO-EV1, wind_gravity, left
+      - {id: 720575940625962568, status: in_783}  # JO-ED2_b, wind_gravity, left
+      - {id: 720575940632767383, status: in_783}  # JO-EV2, wind_gravity, left
+      - {id: 720575940624915230, status: in_783}  # JO-EV3, wind_gravity, left
+
+  jon_f:
+    name_ru: JO-F (усик)
+    about_ru: нейроны Джонстонова органа группы F, левая сторона мухи (список Shiu et al. 2024, рис. 5)
+    paper: {file: figures.ipynb, name: neu_JON_F}
+    paper_ids:
+      - {id: 720575940606239243, status: in_783}  # JO-FV, grooming, left
+      - {id: 720575940626956777, status: in_783}  # JO-FV, grooming, left
+      - {id: 720575940604973746, status: in_783}  # JO-unclear, grooming, left
+      - {id: 720575940622222856, status: in_783}  # JO-FV, grooming, left
+      - {id: 720575940642517284, status: in_783}  # JO-FD1, grooming, left
+      - {id: 720575940629719404, status: in_783}  # JO-FV, grooming, left
+      - {id: 720575940616613022, status: in_783}  # JO-FV, grooming, left
+      - {id: 720575940604299454, status: in_783}  # JO-FD1, grooming, left
+      - {id: 720575940615473186, status: in_783}  # JO-FV, grooming, left
+      - {id: 720575940622217992, status: in_783}  # JO-FD2, grooming, left
+      - {id: 720575940606800341, status: in_783}  # JO-FV, grooming, left
+      - {id: 720575940629267498, status: in_783}  # JO-FV, grooming, left
+      - {id: 720575940637366335, status: in_783}  # JO-FV, grooming, left
+      - {id: 720575940624224408, status: in_783}  # JO-FV, grooming, left
+      - {id: 720575940609543197, status: in_783}  # JO-FV, grooming, left
+      - {id: 720575940633364179, status: in_783}  # JO-FV, grooming, left
+      - {id: 720575940629502009, status: in_783}  # JO-unclear, grooming, left
+      - {id: 720575940606431189, status: in_783}  # JO-FV, grooming, left
+      - {id: 720575940625733960, status: in_783}  # JO-FV, grooming, left
+      - {id: 720575940638529525, status: in_783}  # JO-FV, grooming, left
+      - {id: 720575940617524053, status: in_783}  # JO-FV, grooming, left
+      - {id: 720575940628935564, status: in_783}  # JO-FV, grooming, left
+      - {id: 720575940624308355, status: in_783}  # JO-FV, grooming, left
+      - {id: 720575940631170346, status: in_783}  # JO-FV, grooming, left
+      - {id: 720575940627704375, status: in_783}  # JO-FV, grooming, left
+      - {id: 720575940625885512, status: in_783}  # JO-FD2, grooming, left
+      - {id: 720575940614929245, status: in_783}  # JO-FV, grooming, left
+      - {id: 720575940647493241, status: in_783}  # JO-FV, grooming, left
+      - {id: 720575940618888368, status: in_783}  # JO-FD2, grooming, left
+      - {id: 720575940625087546, status: in_783}  # JO-FV, grooming, left
+      - {id: 720575940606657493, status: in_783}  # JO-FV, grooming, left
+      - {id: 720575940617273560, status: in_783}  # JO-FV, grooming, left
+      - {id: 720575940640591861, status: in_783}  # JO-FD1, grooming, left
+      - {id: 720575940639410035, status: in_783}  # JO-FV, grooming, left
+      - {id: 720575940621532413, status: in_783}  # JO-FV, grooming, left
+      - {id: 720575940627523584, status: in_783}  # JO-FV, grooming, left
+      - {id: 720575940621521917, status: in_783}  # JO-FV, grooming, left
+      - {id: 720575940621097398, status: in_783}  # JO-FV, grooming, left
+      - {id: 720575940625915338, status: in_783}  # JO-FV, grooming, left
+      - {id: 720575940606222428, status: in_783}  # JO-FV, grooming, left
+      - {id: 720575940627868471, status: in_783}  # JO-FV, grooming, left
+      - {id: 720575940622179497, status: in_783}  # JO-FV, grooming, left
+      - {id: 720575940608297774, status: in_783}  # JO-FV, grooming, left
+      - {id: 720575940614026269, status: in_783}  # JO-FV, grooming, left
+      - {id: 720575940613012959, status: in_783}  # JO-FV, grooming, left
+      - {id: 720575940628100614, status: in_783}  # JO-FD2, grooming, left
+      - {id: 720575940606611401, status: in_783}  # JO-FV, grooming, left
+      - {id: 720575940628649465, status: in_783}  # JO-FV, grooming, left
+      - {id: 720575940610008217, status: in_783}  # JO-FV, grooming, left
+      - {id: 720575940623791152, status: in_783}  # JO-FV, grooming, left
+      - {id: 720575940625571240, status: in_783}  # JO-FV, grooming, left
+      - {id: 720575940634923621, status: in_783}  # JO-FD1, grooming, left
+      - {id: 720575940609530653, status: in_783}  # JO-FD2, grooming, left
+      - {id: 720575940635968745, status: in_783}  # JO-FD2, grooming, left
+      - {id: 720575940625703434, status: in_783}  # JO-FD1, grooming, left
+      - {id: 720575940613105311, status: in_783}  # JO-FV, grooming, left
+      - {id: 720575940629386819, status: in_783}  # JO-FV, grooming, left
+      - {id: 720575940623077389, status: in_783}  # JO-FV, grooming, left
+      - {id: 720575940625763015, status: in_783}  # JO-FV, grooming, left
+      - {id: 720575940628359017, status: in_783}  # JO-FV, grooming, left
+
+  jon_dm:
+    name_ru: JO-D/m (усик)
+    about_ru: нейроны Джонстонова органа групп D и m, левая сторона мухи (список Shiu et al. 2024, рис. 5)
+    paper: {file: figures.ipynb, name: neu_JON_D_m}
+    paper_ids:
+      - {id: 720575940630834171, status: in_783}  # JO-CM, -, left
+      - {id: 720575940622892988, status: in_783}  # JO-DP, wind_gravity, left
+      - {id: 720575940621289537, status: in_783}  # JO-DA, wind_gravity, left
+      - {id: 720575940641395163, status: in_783}  # JO-DA, wind_gravity, left
+      - {id: 720575940616064546, status: in_783}  # JO-mz, -, left
+      - {id: 720575940628978409, status: in_783}  # JO-mz, -, left
+      - {id: 720575940652566177, status: in_783}  # JO-DP, wind_gravity, left
+      - {id: 720575940627493096, status: in_783}  # JO-CM, -, left
+      - {id: 720575940619085397, status: in_783}  # JO-DA, wind_gravity, left
+      - {id: 720575940635545310, status: in_783}  # JO-DA, wind_gravity, left
+      - {id: 720575940645728803, status: in_783}  # JO-mz, -, left
+      - {id: 720575940629141775, status: in_783}  # JO-DA, wind_gravity, left
+      - {id: 720575940626557995, status: in_783}  # JO-DP, wind_gravity, left
+      - {id: 720575940631098338, status: in_783}  # JO-EV1, -, left
+      - {id: 720575940639904475, status: in_783}  # JO-mz, -, left
+      - {id: 720575940635067034, status: in_783}  # JO-DA, wind_gravity, left
+
+  antenna:
+    name_ru: Касание усика
+    about_ru: все нейроны Джонстонова органа из статьи (в коде Shiu — neu_JON_all = JO-CE + JO-F + JO-D/m)
+    honesty_ru: >-
+      Не физическое касание, а прямое включение чувствительных нейронов усика. В таблице аннотаций
+      они подписаны wind_gravity и grooming: одни и те же нейроны отвечают и на ветер, и на касание (D-014).
+    union: [jon_ce, jon_f, jon_dm]
+
+  shadow_left:
+    name_ru: Надвигающаяся тень (левая сторона)
+    about_ru: зрительные нейроны LPLC2 и LC4 левой стороны мухи — они реагируют на приближающийся объект
+    honesty_ru: >-
+      Эксперимент вне статьи: группу выбрали мы по таблице аннотаций, в статье Shiu такого опыта нет.
+      Глаза в модели нет — это прямое включение зрительных нейронов (D-013).
+    select: {cell_type: [LPLC2, LC4], side: left}
+
+  shadow_right:
+    name_ru: Надвигающаяся тень (правая сторона)
+    about_ru: зрительные нейроны LPLC2 и LC4 правой стороны мухи — они реагируют на приближающийся объект
+    honesty_ru: >-
+      Эксперимент вне статьи: группу выбрали мы по таблице аннотаций, в статье Shiu такого опыта нет.
+      Глаза в модели нет — это прямое включение зрительных нейронов (D-013).
+    select: {cell_type: [LPLC2, LC4], side: right}
+
+readouts:
+  MN9:
+    name_ru: MN9
+    about_ru: мотонейрон хоботка; по статье включается от сахара и воды (Б1, Б4)
+    select: {cell_type: CB0701}
+    paper: {file: figures.ipynb, name: ids_mn9}
+    paper_ids:
+      - {id: 720575940660219265, status: in_783}  # CB0701, ingestion_motor_neuron, right
+      - {id: 720575940645521262, status: not_in_783}  # в 783 не найден
+
+  aDN1:
+    name_ru: aDN1
+    about_ru: нисходящий нейрон груминга усика; по статье включается от касания усика (Б5)
+    select: {cell_type: DNg62}
+    paper: {file: figures.ipynb, name: id_DN1_1}
+    paper_ids:
+      - {id: 720575940616185531, status: in_783}  # DNg62, -, right
+
+  aDN2:
+    name_ru: aDN2
+    about_ru: нисходящий нейрон груминга усика; по статье включается от касания усика (Б5)
+    select: {cell_type: DNge078}
+    paper: {file: figures.ipynb, name: id_DN2_l}
+    paper_ids:
+      - {id: 720575940629806974, status: in_783}  # DNge078, -, right
+
+  aBN1:
+    name_ru: aBN1
+    about_ru: промежуточный нейрон груминга усика; по статье включается от JO-CE, а от JO-F почти нет (Б5, Б6)
+    select: {cell_type: SAD093}
+    paper: {file: figures.ipynb, name: id_aBN1}
+    paper_ids:
+      - {id: 720575940630907434, status: in_783}  # SAD093, -, left
+
+  GF:
+    name_ru: GF
+    about_ru: гигантское волокно — нейрон реакции побега; ожидаемый исполнитель опыта «тень» (В)
+    honesty_ru: >-
+      Не из статьи Shiu: тип DNp01 выбран нами по таблице аннотаций (там же указано имя Giant Fiber).
+      Опыт с тенью в статье не проверялся (D-013).
+    select: {cell_type: DNp01}
+
+  DNa01:
+    name_ru: DNa01
+    about_ru: нисходящий нейрон поворота при ходьбе (понадобится на этапе M2)
+    honesty_ru: Не из статьи Shiu, выбран нами по таблице аннотаций для этапа M2.
+    select: {cell_type: DNa01}
+
+  DNa02:
+    name_ru: DNa02
+    about_ru: нисходящий нейрон поворота при ходьбе (понадобится на этапе M2)
+    honesty_ru: Не из статьи Shiu, выбран нами по таблице аннотаций для этапа M2.
+    select: {cell_type: DNa02}
+
+  Roundup:
+    name_ru: Roundup
+    about_ru: нейрон цепи кормления из статьи (подглоточная область, рис. 2)
+    select: {cell_type: CB0553}
+    paper: {file: sez_neurons.pickle, name: roundup}
+    paper_ids:
+      - {id: 720575940607272649, status: in_783}  # CB0553, -, right
+      - {id: 720575940623211725, status: in_783}  # CB0553, -, left
+
+  Rattle:
+    name_ru: Rattle
+    about_ru: нейрон цепи кормления из статьи (подглоточная область, рис. 2)
+    select: {cell_type: CB0499}
+    paper: {file: sez_neurons.pickle, name: rattle}
+    paper_ids:
+      - {id: 720575940630461660, status: in_783}  # CB0499, -, right
+      - {id: 720575940638103349, status: in_783}  # CB0499, -, left
+
+  Phantom:
+    name_ru: Phantom
+    about_ru: нейрон цепи кормления из статьи (подглоточная область, рис. 2)
+    select: {cell_type: CB0062}
+    paper: {file: sez_neurons.pickle, name: phantom}
+    paper_ids:
+      - {id: 720575940637763135, status: in_783}  # CB0062, -, right
+      - {id: 720575940616103218, status: in_783}  # CB0062, -, left
+
+  Usnea:
+    name_ru: Usnea
+    about_ru: нейрон цепи кормления из статьи (подглоточная область, рис. 2)
+    select: {cell_type: CB0008}
+    paper: {file: sez_neurons.pickle, name: usnea}
+    paper_ids:
+      - {id: 720575940641366517, status: in_783}  # CB0008, -, right
+      - {id: 720575940632648612, status: in_783}  # CB0008, -, left
+
+  Fdg:
+    name_ru: Fdg
+    about_ru: нейрон цепи кормления из статьи (подглоточная область, рис. 2)
+    select: {cell_type: CB0038}
+    paper: {file: sez_neurons.pickle, name: Fdg}
+    paper_ids:
+      - {id: 720575940647030324, status: in_783}  # CB0038, -, right
+      - {id: 720575940631997032, status: in_783}  # CB0038, -, left
+
+  FMIn:
+    name_ru: FMIn
+    about_ru: нейрон цепи кормления из статьи (подглоточная область, рис. 2)
+    select: {cell_type: CB0366}
+    paper: {file: sez_neurons.pickle, name: FMIn}
+    paper_ids:
+      - {id: 720575940636675214, status: in_783}  # CB0366, -, right
+      - {id: 720575940614763666, status: in_783}  # CB0366, -, left
+
+  G2N-1:
+    name_ru: G2N-1
+    about_ru: вкусовой нейрон второго порядка из статьи (подглоточная область, рис. 2)
+    select: {cell_type: CB0616}
+    paper: {file: sez_neurons.pickle, name: G2N_1}
+    paper_ids:
+      - {id: 720575940623718380, status: in_783}  # CB0616, -, right
+      - {id: 720575940620874757, status: in_783}  # CB0616, -, left
+
+  motor_all:
+    name_ru: Все моторные нейроны
+    about_ru: моторные нейроны мозга по таблице аннотаций (для панели «исполнителей»)
+    honesty_ru: Весь класс motor по таблице аннотаций; это наш выбор для панели, а не список статьи.
+    select: {super_class: motor}
+
+  descending_all:
+    name_ru: Все нисходящие нейроны
+    about_ru: нисходящие нейроны (передают команды из мозга в тело) по таблице аннотаций, для панели «исполнителей»
+    honesty_ru: Весь класс descending по таблице аннотаций; это наш выбор для панели, а не список статьи.
+    select: {super_class: descending}

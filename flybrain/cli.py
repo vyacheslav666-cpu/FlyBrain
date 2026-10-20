@@ -23,6 +23,9 @@ def main(argv: list[str] | None = None) -> int:
     subparsers = parser.add_subparsers(dest="command", metavar="команда")
     subparsers.add_parser("doctor", help="проверить, что машина готова к работе")
     subparsers.add_parser("fetch-data", help="скачать данные в data/raw/ и сверить контрольные суммы")
+    subparsers.add_parser(
+        "build-data", help="собрать таблицу нейронов, матрицу связей, группы и картинку в data/processed/"
+    )
 
     args = parser.parse_args(argv)
     if args.command == "doctor":
@@ -33,5 +36,9 @@ def main(argv: list[str] | None = None) -> int:
         from flybrain.fetch import run_fetch_data
 
         return run_fetch_data()
+    if args.command == "build-data":
+        from flybrain.build import run_build_data
+
+        return run_build_data()
     parser.print_help()
     return 0
