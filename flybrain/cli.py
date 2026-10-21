@@ -27,7 +27,7 @@ def main(argv: list[str] | None = None) -> int:
         "build-data", help="собрать таблицу нейронов, матрицу связей, группы и картинку в data/processed/"
     )
     reference = subparsers.add_parser(
-        "reference", help="эталонные прогоны оригинального кода Shiu на Brian2 в data/reference/ (около 20 минут)"
+        "reference", help="эталонные прогоны оригинального кода Shiu на Brian2 в data/reference/ (около 25 минут)"
     )
     reference.add_argument("--jobs", type=int, default=6, help="сколько повторов считать одновременно (по умолчанию 6)")
     reference.add_argument("--trials", type=int, help="повторов на условие (по умолчанию 30 — из config/reference.yaml)")
@@ -44,6 +44,13 @@ def main(argv: list[str] | None = None) -> int:
                      help="где считать: auto — видеокарта, если есть (по умолчанию)")
     sim.add_argument("--seed", type=int, help="зерно случайных чисел (для точного повторения)")
     sim.add_argument("--top", type=int, default=20, help="сколько самых активных нейронов показать (по умолчанию 20)")
+    validate = subparsers.add_parser(
+        "validate", help="проверить движок против эталона Brian2 и выводов статьи, написать docs/VALIDATION.md"
+    )
+    validate.add_argument("--device", choices=["auto", "cuda", "cpu"], default="auto",
+                          help="где считать движок: auto — видеокарта, если есть (по умолчанию)")
+    validate.add_argument("--rerun", action="store_true",
+                          help="пересчитать движок заново, даже если готовые результаты подходят")
     serve = subparsers.add_parser("serve", help="запустить сервер и открыть 3D-облако нейронов в браузере")
     serve.add_argument("--port", type=int, default=8765, help="порт сервера (по умолчанию 8765)")
     serve.add_argument("--no-browser", action="store_true", help="не открывать браузер автоматически")
@@ -75,6 +82,10 @@ def main(argv: list[str] | None = None) -> int:
         stimuli = [key.strip() for key in args.stim.split(",") if key.strip()]
         return run_sim(stimuli, hz=args.hz, trials=args.trials, duration_ms=args.duration_ms,
                        device=args.device, seed=args.seed, top=args.top)
+    if args.command == "validate":
+        from flybrain.validate import run_validate
+
+        return run_validate(device=args.device, rerun=args.rerun)
     if args.command == "serve":
         from flybrain.server import run_serve
 

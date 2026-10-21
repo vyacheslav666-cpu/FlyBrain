@@ -131,6 +131,12 @@ def _peak_memory_gb() -> float:
     return resource.getrusage(resource.RUSAGE_SELF).ru_maxrss / 1024**2
 
 
+def _root_cause(exc: BaseException) -> str:
+    while exc.__cause__ is not None:
+        exc = exc.__cause__
+    return f"{type(exc).__name__}: {exc}"
+
+
 def run_one_trial(task: dict) -> dict:
     """Один повтор: `run_trial` Shiu с его же параметрами; меняются только частоты стимулов."""
     started = time.monotonic()
@@ -143,7 +149,12 @@ def run_one_trial(task: dict) -> dict:
     params["r_poi2"] = task["r_poi2_hz"] * brian2.Hz
     params["t_run"] = task["duration_ms"] * brian2.ms
     brian2.seed(task["seed"])
-    spikes = shiu.run_trial(task["exc"], task["exc2"], [], task["path_comp"], task["path_con"], params)
+    try:
+        spikes = shiu.run_trial(task["exc"], task["exc2"], [], task["path_comp"], task["path_con"], params)
+    except Exception as exc:
+        # Ошибка Brian2 держит ссылки на скомпилированный код, и передать её в главный процесс нельзя
+        # («cannot pickle 'PyCapsule'»): передаём текст первопричины.
+        raise RuntimeError(_root_cause(exc)) from None
 
     neurons = np.array(sorted(spikes), dtype=np.int32)
     times = [np.asarray(spikes[i] / brian2.second, dtype=np.float64) for i in neurons]
@@ -426,18 +437,34 @@ def _run_pool(tasks: list[dict], jobs: int, conditions: list[Condition], done: d
               "Чтобы продолжить, выполните ту же команду ещё раз.", flush=True)
         return 130
     except BrokenProcessPool:
-        executor.shutdown(wait=False, cancel_futures=True)
+        _stop_workers(executor)
         print(f"\n[ОШИБКА] процесс расчёта неожиданно завершился (часто — не хватило памяти, или нажат Ctrl+C). "
               f"Сохранено повторов: {finished_before + len(stats)} из {total}. Запустите ту же команду ещё раз, "
               "можно с меньшим --jobs.", file=sys.stderr, flush=True)
         return 1
     except Exception as exc:  # ошибка внутри повтора: остальные повторы не теряются
-        executor.shutdown(wait=False, cancel_futures=True)
-        print(f"\n[ОШИБКА] повтор завершился с ошибкой: {type(exc).__name__}: {exc}\n"
+        _stop_workers(executor)
+        hint = ""
+        if "Visual Studio" in str(exc) or "compiler" in str(exc).lower():
+            hint = ("\nBrian2 не нашёл компилятор C++ (он нужен, когда встречается новая частота стимула). "
+                    "Запускайте команду из PowerShell или cmd: в Git Bash Windows не передаёт программам "
+                    "переменную ProgramFiles(x86), по которой ищется Visual Studio. Проверка: uv run flybrain doctor")
+        print(f"\n[ОШИБКА] повтор завершился с ошибкой: {type(exc).__name__}: {exc}{hint}\n"
               f"Сохранено повторов: {finished_before + len(stats)} из {total}.", file=sys.stderr, flush=True)
         return 1
     executor.shutdown()
     return 0
+
+
+def _stop_workers(executor: ProcessPoolExecutor) -> None:
+    """Сразу остановить процессы-повторы: иначе после ошибки команда может так и не завершиться.
+
+    Готовые повторы не теряются: файл повтора появляется под своим именем только целиком (`.part` → `os.replace`).
+    """
+    for process in list((executor._processes or {}).values()):
+        process.terminate()
+    # Ждём, пока остановленные процессы закроются: без этого служебный поток пула печатает лишнюю ошибку.
+    executor.shutdown(wait=True, cancel_futures=True)
 
 
 def _free_memory_gb() -> float | None:

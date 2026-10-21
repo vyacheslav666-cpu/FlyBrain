@@ -49,5 +49,26 @@ conditions:
       способ перемешивания — наш выбор (у Shiu он не записан): получатели всех связей переставлены
       случайно; у каждого нейрона сохранены число входов, число выходов и веса выходов (D-029)
 
+  # [ЧЕСТНОСТЬ] Три условия ниже добавлены в C6, после того как увидели эталон C4 (вода 100 Гц не включает MN9).
+  # Опыт статьи (рис. 4): сахар 40 Гц и вода 40 Гц по отдельности MN9 заметно не включают, а вместе включают.
+  # Устроены как сетка Shiu в figures.ipynb (Sugar_Water_<сахар>_Hz_<вода>_Hz): сахар — первая группа стимулов,
+  # вода — вторая; «отдельно» значит, что у другой группы частота 0 Гц, как в той же сетке (D-031).
+  - key: sugar_40hz_water_0hz
+    name_ru: сахар 40 Гц отдельно
+    excite: {group: sugar, hz: 40}
+    excite2: {group: water, hz: 0}
+    honesty_ru: &added_after_reference >-
+      добавлено после того, как увидели эталон (C6, D-031): опыт статьи «сахар 40 + вода 40 Гц» (рис. 4)
+  - key: sugar_0hz_water_40hz
+    name_ru: вода 40 Гц отдельно
+    excite: {group: sugar, hz: 0}
+    excite2: {group: water, hz: 40}
+    honesty_ru: *added_after_reference
+  - key: sugar_40hz_water_40hz
+    name_ru: сахар 40 + вода 40 Гц
+    excite: {group: sugar, hz: 40}
+    excite2: {group: water, hz: 40}
+    honesty_ru: *added_after_reference
+
 # Нейроны для итоговой таблицы (группы readouts из groups.json; столбцы — по сторонам мухи, D-011).
 summary_readouts: [MN9, aDN1, aDN2, aBN1, GF]
