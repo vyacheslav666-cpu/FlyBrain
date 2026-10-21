@@ -1,6 +1,7 @@
 """`flybrain fetch-data`: скачивание данных с проверкой SHA-256 (D-009, docs/DATA.md)."""
 
 import hashlib
+import http.client
 import sys
 import time
 import urllib.request
@@ -29,9 +30,10 @@ class Source:
     dest: Path
 
 
-def load_sources(path: Path = SOURCES_FILE, root: Path = PROJECT_ROOT) -> list[Source]:
+def load_sources(path: Path = SOURCES_FILE, root: Path = PROJECT_ROOT, section: str = "files") -> list[Source]:
+    """`section`: `files` — обязательные данные (`fetch-data`), `optional` — необязательные (скелеты, D-037)."""
     with open(path, encoding="utf-8") as handle:
-        entries = yaml.safe_load(handle)["files"]
+        entries = yaml.safe_load(handle)[section]
     return [
         Source(
             name=entry["name"],
@@ -58,25 +60,50 @@ def _megabytes(size: float) -> str:
 
 
 def _download(source: Source, target: Path) -> str:
-    """Скачивает во временный файл `target` и возвращает SHA-256 скачанного."""
+    """Скачивает во временный файл `target` и возвращает SHA-256 скачанного.
+
+    Если `target` уже есть (прошлое скачивание оборвалось), просит у сервера только недостающий хвост (D-037);
+    сервер, который так не умеет, отдаёт файл целиком — тогда качаем с начала.
+    """
     digest = hashlib.sha256()
     done = 0
+    headers = {"User-Agent": "flybrain-fetch-data"}
+    have = target.stat().st_size if target.exists() else 0
+    if 0 < have < source.size_bytes and source.url.startswith("http"):
+        headers["Range"] = f"bytes={have}-"
     started = time.monotonic()
     last_print = 0.0
-    request = urllib.request.Request(source.url, headers={"User-Agent": "flybrain-fetch-data"})
+    request = urllib.request.Request(source.url, headers=headers)
     try:
-        with urllib.request.urlopen(request, timeout=60) as response, open(target, "wb") as out:
-            while chunk := response.read(CHUNK):
-                out.write(chunk)
-                digest.update(chunk)
-                done += len(chunk)
-                now = time.monotonic()
-                if now - last_print > 0.5 and source.size_bytes > 100_000:
-                    last_print = now
-                    percent = min(99, 100 * done // max(source.size_bytes, 1))
-                    print(f"\r    скачано {_megabytes(done)} (~{percent}%)", end="", flush=True)
-    except OSError as exc:
-        raise FetchError(f"не удалось скачать {source.url}: {exc}") from exc
+        with urllib.request.urlopen(request, timeout=60) as response:
+            resumed = "Range" in headers and response.status == 206
+            if resumed:
+                print(f"    продолжаю с {_megabytes(have)}: эта часть уже скачана раньше")
+                with open(target, "rb") as old:  # сумма считается по всему файлу, включая скачанное раньше
+                    while chunk := old.read(CHUNK):
+                        digest.update(chunk)
+                done = have
+            length = response.headers.get("Content-Length")
+            expected = done + int(length) if length and length.isdigit() else None
+            with open(target, "ab" if resumed else "wb") as out:
+                while chunk := response.read(CHUNK):
+                    out.write(chunk)
+                    digest.update(chunk)
+                    done += len(chunk)
+                    now = time.monotonic()
+                    if now - last_print > 0.5 and source.size_bytes > 100_000:
+                        last_print = now
+                        percent = min(99, 100 * done // max(source.size_bytes, 1))
+                        print(f"\r    скачано {_megabytes(done)} (~{percent}%)", end="", flush=True)
+            # Оборванная связь не всегда даёт ошибку: чтение просто кончается раньше. Тогда файл не сверяем
+            # (сумма не совпала бы, и скачанное стёрлось бы), а оставляем докачать.
+            if expected is not None and done < expected:
+                raise ConnectionError(f"связь оборвалась: получено {_megabytes(done)} из {_megabytes(expected)}")
+    except (OSError, http.client.HTTPException) as exc:  # обрыв связи бывает и тем, и другим
+        kept = target.exists() and target.stat().st_size > 0
+        hint = ("\n    Скачанная часть сохранена: запустите команду ещё раз — она продолжит с того же места."
+                if kept else "")
+        raise FetchError(f"не удалось скачать {source.url}: {exc}{hint}") from exc
     if source.size_bytes > 100_000:
         print(f"\r    скачано {_megabytes(done)} за {time.monotonic() - started:.0f} с" + " " * 10)
     return digest.hexdigest()
@@ -90,6 +117,9 @@ def fetch_one(source: Source) -> str:
         print(f"    файл {source.dest.name} повреждён или изменён — скачиваю заново")
     source.dest.parent.mkdir(parents=True, exist_ok=True)
     partial = source.dest.with_name(source.dest.name + ".part")
+    if partial.exists() and partial.stat().st_size == source.size_bytes and sha256_of(partial) == source.sha256:
+        partial.replace(source.dest)  # прошлый раз скачалось целиком, но не успело сохраниться под своим именем
+        return "докачано раньше"
     actual = _download(source, partial)
     if actual != source.sha256:
         partial.unlink(missing_ok=True)

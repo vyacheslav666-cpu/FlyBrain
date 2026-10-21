@@ -177,6 +177,7 @@ html, body {
 }
 .card-close:hover { color: var(--text); }
 .card-loading, .card-hint { margin: 10px 0 0; color: var(--muted); font-size: 12px; }
+.card-shape { margin: 8px 0 0; padding-left: 8px; border-left: 2px solid #ffffff; color: var(--text); font-size: 12px; }
 .partners { margin-top: 10px; }
 .partners h3 { margin: 0 0 4px; font-size: 12px; font-weight: 600; letter-spacing: 0.04em; }
 .partners-in h3 { color: #4fc3ff; }
@@ -421,6 +422,7 @@ span.partner-label { color: var(--muted); }
 #view button:hover { background: rgba(255, 255, 255, 0.12); }
 #view button[aria-pressed="true"] { background: rgba(95, 240, 255, 0.18); border-color: #5ff0ff; }
 #view .view-wide { width: 100%; }
+#view button[aria-disabled="true"] { opacity: 0.45; cursor: help; }
 #compass { flex: none; margin-top: 2px; }
 .view-slider { display: grid; grid-template-columns: 62px 1fr 44px; align-items: center; gap: 8px; margin-top: 8px; color: var(--muted); font-size: 12px; }
 .view-slider input { width: 100%; margin: 0; accent-color: #5ff0ff; }

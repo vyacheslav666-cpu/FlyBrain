@@ -14,7 +14,7 @@ from fastapi import FastAPI, HTTPException, Query, WebSocket, WebSocketDisconnec
 from fastapi.responses import FileResponse, JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
 
-from flybrain import executors, live, processed, stimuli, webdata
+from flybrain import executors, live, processed, skeletons, stimuli, webdata
 from flybrain.engine import Engine
 from flybrain.groups import load_group_config
 from flybrain.lookup import NeuronLookup
@@ -51,7 +51,7 @@ def _paper_root_ids(group_config: dict) -> dict[str, set[str]]:
             for key, group in group_config["readouts"].items()}
 
 
-def create_app(processed_dir=PROCESSED_DIR, web_dir=WEB_DIR) -> FastAPI:
+def create_app(processed_dir=PROCESSED_DIR, web_dir=WEB_DIR, skeleton_dir=skeletons.SKELETON_DIR) -> FastAPI:
     state: dict = {}
 
     @asynccontextmanager
@@ -62,6 +62,10 @@ def create_app(processed_dir=PROCESSED_DIR, web_dir=WEB_DIR) -> FastAPI:
         connectivity = processed.load_connectivity(processed_dir)
         state["cloud"] = webdata.build_cloud_gzip(neurons, legend)
         state["meta"] = webdata.build_meta(neurons, legend, names)
+        # Формы нейронов (C12b, D-037) — только если скелеты скачаны командой `flybrain fetch-skeletons`.
+        state["skeletons"], why_not = skeletons.SkeletonStore.open(neurons, skeleton_dir)
+        state["meta"]["skeletons"] = {"available": state["skeletons"] is not None, "reason": why_not}
+        state["points"] = neurons[["x_um", "y_um", "z_um"]].to_numpy(dtype="float32")
         state["lookup"] = NeuronLookup(neurons, connectivity, names, legend)
         # Кнопки-стимулы (C10) и живой мозг (C9): один повтор на видеокарте. Движок строится, только когда откроется первая страница.
         groups = processed.load_groups(processed_dir)
@@ -122,6 +126,17 @@ def create_app(processed_dir=PROCESSED_DIR, web_dir=WEB_DIR) -> FastAPI:
     @app.get("/api/neuron/{index}/links")
     def neuron_links(index: int) -> JSONResponse:
         return JSONResponse(known_neuron(index).links(index), headers={"Cache-Control": "no-cache"})
+
+    @app.get("/api/neuron/{index}/skeleton")
+    def neuron_skeleton(index: int) -> Response:
+        """Форма нейрона: двоичный ответ `SkeletonStore.wire` (docs/DATA.md, раздел 8)."""
+        known_neuron(index)
+        store = state["skeletons"]
+        if store is None:
+            raise HTTPException(status_code=404, detail=state["meta"]["skeletons"]["reason"])
+        if not store.has(index):
+            raise HTTPException(status_code=404, detail="у этого нейрона нет формы в файле скелетов")
+        return Response(store.wire(index, state["points"][index]), media_type="application/octet-stream")
 
     @app.get("/api/search")
     def search(q: str = Query(max_length=100)) -> JSONResponse:

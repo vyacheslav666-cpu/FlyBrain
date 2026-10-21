@@ -51,3 +51,14 @@ files:
     sha256: b214970b55d2fbe0853bba536fdcb9e28730f4eb7ab06f600491df795da683cd
     size_bytes: 31720298
     dest: data/raw/flywire/Supplemental_file1_neuron_annotations.tsv
+
+# Необязательные данные (DATA.md, раздел 3): скачиваются отдельной командой `flybrain fetch-skeletons` (D-037).
+# У Zenodo записи неизменны; там опубликована сумма MD5 a4c104776f33ec539ef859064c4de3df — при первом скачивании
+# она совпала, и мы записали SHA-256 того же файла.
+optional:
+  - name: sk_lod1_783_healed_ds2.parquet
+    description: скелеты (формы) всех нейронов FlyWire 783, в нм; Schlegel et al. 2024, CC BY 4.0
+    url: https://zenodo.org/api/records/10877326/files/sk_lod1_783_healed_ds2.parquet/content
+    sha256: c83e95a672f466cead5c3bc3e295280a6003e6d63ec6c777e53603c056feb6a8
+    size_bytes: 5355543468
+    dest: data/raw/skeletons/sk_lod1_783_healed_ds2.parquet
