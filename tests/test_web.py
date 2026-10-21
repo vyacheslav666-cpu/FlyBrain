@@ -103,3 +103,33 @@ def test_server_serves_page_data_and_scripts():
         assert client.get("/web/vendor/three.module.js").status_code == 200
         # Файлы страницы всегда сверяются с сервером: иначе после обновления браузер мог бы взять старый код.
         assert script.headers["cache-control"] == "no-cache"
+
+
+def test_docs_pages_and_validation_summary(tmp_path):
+    # Без `with`: данные нейронов не грузятся, документам и итогам проверки они не нужны.
+    (tmp_path / "validation").mkdir()
+    (tmp_path / "GUIDE.md").write_text("# Проверка\n\n| а | б |\n|---|---|\n| 1 | 2 |\n\n<script>alert(1)</script>\n\n"
+                                       "![картинка](validation/pic.png)\n", encoding="utf-8")
+    (tmp_path / "validation" / "pic.png").write_bytes(b"\x89PNG")
+    client = TestClient(create_app(docs_dir=tmp_path))
+    missing = client.get("/api/validation")
+    assert missing.status_code == 404 and "flybrain validate" in missing.json()["detail"]
+    (tmp_path / "validation" / "summary.json").write_text('{"a": {"passed": 1, "total": 1}}', encoding="utf-8")
+    assert client.get("/api/validation").json()["a"] == {"passed": 1, "total": 1}
+
+    page = client.get("/docs/GUIDE.md")
+    assert page.status_code == 200 and "<title>Проверка — FlyBrain</title>" in page.text and "<table>" in page.text
+    assert "<script>" not in page.text  # HTML внутри документа показывается текстом, а не выполняется
+    assert '<img src="validation/pic.png"' in page.text
+    assert client.get("/docs/validation/pic.png").status_code == 200
+    for bad in ("/docs/NOPE.md", "/docs/..%2Fpyproject.toml", "/docs/validation/..%2F..%2Fpyproject.toml"):
+        assert client.get(bad).status_code == 404, bad
+
+
+def test_real_report_and_guide_open_as_pages():
+    client = TestClient(create_app())
+    for name, words in (("VALIDATION.md", "Проверка движка"), ("USER_GUIDE.md", "FlyBrain")):
+        page = client.get(f"/docs/{name}")
+        assert page.status_code == 200 and words in page.text, name
+    summary = client.get("/api/validation").json()
+    assert summary["a"]["total"] > 0 and {item["key"] for item in summary["items"]} >= {"Б1", "Б7", "В"}

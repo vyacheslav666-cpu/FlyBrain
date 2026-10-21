@@ -2,6 +2,7 @@
 // сервер считает модель и шлёт, кто выстрелил; выстрелившие нейроны вспыхивают и гаснут.
 import * as THREE from "three";
 import { OrbitControls } from "/web/vendor/OrbitControls.js";
+import { createAbout } from "./about.js";
 import { HEADER_BYTES, MAX_CLASSES, NO_POSITION, POINT_SIZE_UM } from "./constants.js";
 import { createCompass } from "./compass.js";
 import { createFpsMeter } from "./fps.js";
@@ -774,4 +775,6 @@ function start({ meta, stimuli, executors, positions, classes }) {
   window.flybrain = { camera, controls, renderer, scene, picker, pin, unpin, live, glow, silhouette, shape, flyToView, fps }; // для отладки в консоли браузера
 }
 
+// Окно «О проекте» работает и тогда, когда нейроны не загрузились.
+createAbout();
 loadData().then(start).catch((error) => showError(`Ошибка: ${error.message}`));

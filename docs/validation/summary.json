@@ -1,0 +1,106 @@
+{
+ "a": {
+  "passed": 15,
+  "total": 15
+ },
+ "items": [
+  {
+   "key": "Б1",
+   "title": "Сахар (одна сторона) → MN9 с обеих сторон, на противоположной сильнее",
+   "reference": "pass",
+   "engine": "pass",
+   "added_after_reference": false,
+   "words": "Повторился и в эталоне Brian2, и в движке."
+  },
+  {
+   "key": "Б2",
+   "title": "Сахар 10 → 200 Гц: откликнувшихся нейронов от десятков до сотен",
+   "reference": "pass",
+   "engine": "pass",
+   "added_after_reference": false,
+   "words": "Повторился и в эталоне Brian2, и в движке."
+  },
+  {
+   "key": "Б3",
+   "title": "Сахар + сильная горечь: ответ MN9 на сахар подавлен",
+   "reference": "pass",
+   "engine": "pass",
+   "added_after_reference": false,
+   "words": "Повторился и в эталоне Brian2, и в движке."
+  },
+  {
+   "key": "Б4",
+   "title": "Вода 100 Гц → MN9 активен",
+   "reference": "fail",
+   "engine": "fail",
+   "added_after_reference": false,
+   "words": "Не повторился уже в оригинальном Brian2 на версии 783 — значит, дело не в движке."
+  },
+  {
+   "key": "Б5",
+   "title": "Касание усика (все JON) → aDN1, aDN2, aBN1 активны",
+   "reference": "pass",
+   "engine": "pass",
+   "added_after_reference": false,
+   "words": "Повторился и в эталоне Brian2, и в движке."
+  },
+  {
+   "key": "Б6",
+   "title": "JO-CE включает aBN1, JO-F — почти нет",
+   "reference": "boundary",
+   "engine": "pass",
+   "added_after_reference": false,
+   "words": "Эталон — на границе, движок — да. Числа эталона и движка отличаются в пределах случайности."
+  },
+  {
+   "key": "Б7",
+   "title": "Связи перемешаны → MN9 молчит",
+   "reference": "pass",
+   "engine": "pass",
+   "added_after_reference": false,
+   "words": "Повторился и в эталоне Brian2, и в движке."
+  },
+  {
+   "key": "В",
+   "title": "Тень (LPLC2 + LC4, левая сторона) → гигантское волокно",
+   "reference": "info",
+   "engine": "info",
+   "added_after_reference": false,
+   "words": "В эталоне Brian2 включились оба гигантских волокна — левое (144,4 Гц) и правое (101,1 Гц); сильнее левое, на стороне стимула; в движке включились оба гигантских волокна — левое (144,4 Гц) и правое (102,3 Гц); сильнее левое, на стороне стимула."
+  },
+  {
+   "key": "Д1",
+   "title": "Сахар 40 и вода 40 Гц по отдельности MN9 почти не включают, а вместе включают",
+   "reference": "pass",
+   "engine": "pass",
+   "added_after_reference": true,
+   "words": "Повторился и в эталоне Brian2, и в движке."
+  },
+  {
+   "key": "Д2",
+   "title": "Вода 200 Гц → MN9 активен",
+   "reference": "pass",
+   "engine": "pass",
+   "added_after_reference": true,
+   "words": "Повторился и в эталоне Brian2, и в движке."
+  }
+ ],
+ "marks": {
+  "pass": {
+   "mark": "✅",
+   "word": "да"
+  },
+  "fail": {
+   "mark": "❌",
+   "word": "нет"
+  },
+  "boundary": {
+   "mark": "⚠️",
+   "word": "на границе"
+  },
+  "info": {
+   "mark": "ℹ️",
+   "word": "описание"
+  }
+ }
+}

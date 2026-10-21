@@ -142,3 +142,28 @@ def test_paper_neurons_are_marked():
     assert paper == {"MN9": ("720575940660219265", "right"), "aDN1": ("720575940616185531", "right"),
                      "aDN2": ("720575940629806974", "right"), "aBN1": ("720575940630907434", "left")}
     assert len(keys) == 10
+
+
+def test_summary_for_about_window_uses_report_marks():
+    from types import SimpleNamespace
+
+    from flybrain.report import summary_data
+
+    ok, bad = Verdict([Check("ok", 1.0)], ["1"]), Verdict([Check("bad", -1.0)], ["2"])
+    edge = Verdict([Check("edge", 0.1, se=0.2)], ["3"])
+    shadow = Verdict([], ["4"], {"GF Л": (144.0, 0.5), "GF П": (0.2, 0.1)})
+    verdicts = {item.key: (ok, ok) for item in ITEMS}
+    verdicts.update({"Б4": (bad, bad), "Б6": (edge, ok), "В": (shadow, shadow)})
+    results = SimpleNamespace(verdicts=verdicts, conditions=[SimpleNamespace(key="a"), SimpleNamespace(key="b")],
+                              agreements={"a": SimpleNamespace(ok=True), "b": SimpleNamespace(ok=False)})
+    data = summary_data(results)
+    assert data["a"] == {"passed": 1, "total": 2}
+    assert [item["key"] for item in data["items"]] == [item.key for item in ITEMS]
+    items = {item["key"]: item for item in data["items"]}
+    assert items["Б1"]["words"] == "Повторился и в эталоне Brian2, и в движке."
+    assert (items["Б4"]["reference"], items["Б4"]["engine"]) == (FAIL, FAIL)
+    assert "дело не в движке" in items["Б4"]["words"]
+    assert items["Б6"]["reference"] == BOUNDARY and items["Б6"]["words"].startswith("Эталон — на границе, движок — да.")
+    assert items["В"]["reference"] == INFO and "только левое" in items["В"]["words"]
+    assert items["Д1"]["added_after_reference"] and not items["Б1"]["added_after_reference"]
+    assert data["marks"][BOUNDARY] == {"mark": "⚠️", "word": "на границе"}

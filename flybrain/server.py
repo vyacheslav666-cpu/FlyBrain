@@ -11,10 +11,10 @@ import webbrowser
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, HTTPException, Query, WebSocket, WebSocketDisconnect
-from fastapi.responses import FileResponse, JSONResponse, Response
+from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
 
-from flybrain import executors, live, processed, skeletons, stimuli, webdata
+from flybrain import docpage, executors, live, processed, skeletons, stimuli, webdata
 from flybrain.engine import Engine
 from flybrain.groups import load_group_config
 from flybrain.lookup import NeuronLookup
@@ -51,7 +51,8 @@ def _paper_root_ids(group_config: dict) -> dict[str, set[str]]:
             for key, group in group_config["readouts"].items()}
 
 
-def create_app(processed_dir=PROCESSED_DIR, web_dir=WEB_DIR, skeleton_dir=skeletons.SKELETON_DIR) -> FastAPI:
+def create_app(processed_dir=PROCESSED_DIR, web_dir=WEB_DIR, skeleton_dir=skeletons.SKELETON_DIR,
+               docs_dir=docpage.DOCS_DIR) -> FastAPI:
     state: dict = {}
 
     @asynccontextmanager
@@ -142,6 +143,22 @@ def create_app(processed_dir=PROCESSED_DIR, web_dir=WEB_DIR, skeleton_dir=skelet
     def search(q: str = Query(max_length=100)) -> JSONResponse:
         return JSONResponse(state["lookup"].search(q), headers={"Cache-Control": "no-cache"})
 
+    @app.get("/api/validation")
+    def validation_summary() -> FileResponse:
+        """Короткие итоги `flybrain validate` для окна «О проекте» (C13, D-039)."""
+        path = docs_dir / docpage.VALIDATION_SUMMARY
+        if not path.is_file():
+            raise HTTPException(status_code=404, detail="итогов проверки нет. Выполните: uv run flybrain validate")
+        return FileResponse(path, media_type="application/json", headers={"Cache-Control": "no-cache"})
+
+    @app.get("/docs/{name}")
+    def document(name: str) -> HTMLResponse:
+        """Документ из docs/ как страница: отчёт о проверке, инструкция и соседние документы по ссылкам."""
+        path = docpage.doc_path(name, docs_dir)
+        if path is None:
+            raise HTTPException(status_code=404, detail="нет такого документа")
+        return HTMLResponse(docpage.render_doc(path), headers={"Cache-Control": "no-cache"})
+
     @app.websocket("/ws/live")
     async def live_stream(socket: WebSocket) -> None:
         """Поток живого мозга: сервер шлёт кадры (двоичные) и состояние (JSON), страница — команды (JSON)."""
@@ -183,6 +200,8 @@ def create_app(processed_dir=PROCESSED_DIR, web_dir=WEB_DIR, skeleton_dir=skelet
             await asyncio.gather(sender, return_exceptions=True)
 
     app.mount("/web", NoCacheStaticFiles(directory=web_dir), name="web")
+    # Картинки документов (docs/validation/*.png, docs/guide/*.png); сами .md отдаёт `document` выше.
+    app.mount("/docs", NoCacheStaticFiles(directory=docs_dir), name="docs")
     return app
 
 

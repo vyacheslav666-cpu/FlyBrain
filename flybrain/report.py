@@ -4,12 +4,14 @@
 и движка, отметка и что она значит. Файл каждый раз собирается заново — вручную его не правят.
 """
 
+import json
 import math
 from pathlib import Path
 
 import numpy as np
 import torch
 
+from flybrain.docpage import DOCS_DIR, VALIDATION_SUMMARY
 from flybrain.paths import PROJECT_ROOT
 from flybrain.reference import ACTIVE_HZ
 from flybrain.validate import BOUNDARY, BOUNDARY_SE, CORR_MIN, FAIL, INFO, ITEMS, KEY_ABS_HZ, KEY_REL, MARKS, \
@@ -196,6 +198,18 @@ def _tests_lines(verdict: Verdict) -> list[str]:
     return [f"  - {MARKS[test.state]} {test.text}" for test in verdict.tests]
 
 
+# Итог пункта по паре отметок (эталон, движок): (одно, несколько) — для «Главного» в отчёте и окна «О проекте».
+PHRASES = {
+    (PASS, PASS): ("повторился и в эталоне Brian2, и в движке", "повторились и в эталоне Brian2, и в движке"),
+    (FAIL, FAIL): ("не повторился уже в оригинальном Brian2 на версии 783 — значит, дело не в движке",
+                   "не повторились уже в оригинальном Brian2 на версии 783 — значит, дело не в движке"),
+    (PASS, FAIL): ("эталон выполняет, движок — нет: расхождение движка", "эталон выполняет, движок — нет: "
+                                                                      "расхождение движка"),
+    (FAIL, PASS): ("движок выполняет, эталон — нет: расхождение движка", "движок выполняет, эталон — нет: "
+                                                                      "расхождение движка"),
+}
+
+
 def _summary_lines(results: Results) -> list[str]:
     lines = []
     agreements = results.agreements
@@ -221,21 +235,12 @@ def _summary_lines(results: Results) -> list[str]:
     for item in ITEMS:
         reference, engine = results.verdicts[item.key]
         groups.setdefault((reference.state, engine.state), []).append(item.key)
-    phrases = {  # (одно, несколько)
-        (PASS, PASS): ("повторился и в эталоне Brian2, и в движке", "повторились и в эталоне Brian2, и в движке"),
-        (FAIL, FAIL): ("не повторился уже в оригинальном Brian2 на версии 783 — значит, дело не в движке",
-                       "не повторились уже в оригинальном Brian2 на версии 783 — значит, дело не в движке"),
-        (PASS, FAIL): ("эталон выполняет, движок — нет: расхождение движка", "эталон выполняет, движок — нет: "
-                                                                          "расхождение движка"),
-        (FAIL, PASS): ("движок выполняет, эталон — нет: расхождение движка", "движок выполняет, эталон — нет: "
-                                                                          "расхождение движка"),
-    }
     verdicts = results.verdicts
     for states, keys in groups.items():
         if states[0] == INFO:
             continue
-        if states in phrases:
-            lines.append(f"- **{', '.join(keys)}:** {phrases[states][len(keys) > 1]}.")
+        if states in PHRASES:
+            lines.append(f"- **{', '.join(keys)}:** {PHRASES[states][len(keys) > 1]}.")
             continue
         for key in keys:  # на границе: сразу сырые числа, чтобы граница была видна без чтения раздела
             reference, engine = verdicts[key]
@@ -611,6 +616,33 @@ def figure_keys(results: Results, path: Path) -> None:
     plt.close(fig)
 
 
+def _item_words(reference: Verdict, engine: Verdict) -> str:
+    """Итог пункта одной фразой (сырые числа — только у тени)."""
+    if reference.state == INFO:
+        return _shadow_words(reference, engine, short=True)
+    states = (reference.state, engine.state)
+    if states in PHRASES:
+        return _cap(PHRASES[states][0]) + "."
+    text = f"Эталон — {MARK_WORDS[states[0]]}, движок — {MARK_WORDS[states[1]]}."
+    same = _same_within_noise(reference, engine)
+    if same is not None:
+        text += (" Числа эталона и движка отличаются в пределах случайности." if same else
+                 " Числа эталона и движка отличаются больше чем на две погрешности.")
+    return text
+
+
+def summary_data(results: Results) -> dict:
+    """Короткие итоги для окна «О проекте» на странице (C13, D-039): те же отметки, что в таблице «Итог»."""
+    items = []
+    for item in ITEMS:
+        reference, engine = results.verdicts[item.key]
+        items.append({"key": item.key, "title": item.title, "reference": reference.state, "engine": engine.state,
+                      "added_after_reference": item.key.startswith("Д"), "words": _item_words(reference, engine)})
+    passed = sum(results.agreements[condition.key].ok for condition in results.conditions)
+    return {"a": {"passed": passed, "total": len(results.conditions)}, "items": items,
+            "marks": {state: {"mark": MARKS[state], "word": MARK_WORDS[state]} for state in MARKS}}
+
+
 def write_report(results: Results) -> Path:
     import matplotlib
 
@@ -622,4 +654,7 @@ def write_report(results: Results) -> Path:
     text = render_markdown(results)
     with open(REPORT_FILE, "w", encoding="utf-8", newline="\n") as handle:
         handle.write(text)
+    with open(DOCS_DIR / VALIDATION_SUMMARY, "w", encoding="utf-8", newline="\n") as handle:
+        json.dump(summary_data(results), handle, ensure_ascii=False, indent=1)
+        handle.write("\n")
     return REPORT_FILE

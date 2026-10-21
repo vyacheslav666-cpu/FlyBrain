@@ -116,8 +116,73 @@
     Светятся нейроны, которые только что выстрелили в модели.
     Вид спереди: муха смотрит на вас, её левая сторона — справа на экране. Клавиша H — скрыть панели, F — частота кадров.</p>
     <p class="credits">Данные: коннектом мозга взрослой дрозофилы FlyWire (Dorkenwald et al. 2024;
-    Schlegel et al. 2024), лицензия CC&nbsp;BY&nbsp;4.0.</p>
+    Schlegel et al. 2024), лицензия CC&nbsp;BY&nbsp;4.0; модель — Shiu et al. 2024.
+    <button id="about-open" type="button">ⓘ О проекте: итоги проверки, упрощения, источники</button></p>
   </footer>
+
+  <dialog id="about" aria-labelledby="about-title">
+    <div class="about-head">
+      <h2 id="about-title">О проекте FlyBrain</h2>
+      <button type="button" class="about-close" title="закрыть (Esc)" aria-label="закрыть">×</button>
+    </div>
+    <div class="about-body">
+      <p>Симуляция мозга плодовой мушки дрозофилы на её настоящей «схеме проводов» — коннектоме FlyWire
+      (выпуск 783: 138&nbsp;639 нейронов, 54&nbsp;млн синапсов). Модель мозга — из статьи Shiu et al. (Nature, 2024),
+      без подгонки: параметры как у авторов. Считает её наш движок на видеокарте; он проверен против
+      оригинального кода Shiu. Инструкция — <a href="/docs/USER_GUIDE.md" target="_blank" rel="noopener">docs/USER_GUIDE.md</a>.</p>
+
+      <h3>Итоги проверки</h3>
+      <div id="about-validation"><p class="about-muted">Загружаю итоги…</p></div>
+      <p class="about-link"><a href="/docs/VALIDATION.md" target="_blank" rel="noopener">Подробный отчёт — docs/VALIDATION.md</a>:
+      правила, числа, графики. Его пишет команда <code>uv run flybrain validate</code>; здесь — его же отметки.</p>
+
+      <h3>Что в модели упрощено</h3>
+      <ul>
+        <li>Нет обучения и памяти, нет гормонов и нейромодуляторов, нет голода и усталости.</li>
+        <li>Нет электрических синапсов (контактов, по которым ток идёт прямо из клетки в клетку): в коннектоме видны только химические.</li>
+        <li>Нейрон — точка, без формы дендритов. Формы нейронов на экране — только картинка.</li>
+        <li>Знак связи («возбуждает» или «тормозит») угадан по предсказанному медиатору — и угадан не всегда верно. Берём знак из файла модели Shiu.</li>
+        <li>Нет брюшного нервного тяжа (аналога спинного мозга), поэтому нет мотонейронов ног — только мотонейроны головы.</li>
+        <li>В покое модель молчит: спонтанной активности в ней нет. Живой мозг мухи в покое не молчит.</li>
+        <li>Стимулы — прямое включение сенсорных нейронов случайными импульсами, а не настоящие вкус, касание или тень.
+        Глаз и обработка изображения не моделируются.</li>
+      </ul>
+      <p class="about-honesty"><b>[ЧЕСТНОСТЬ]</b> Задано не коннектомом, а нами: опыт «Надвигающаяся тень» (в статье его нет;
+      группу нейронов и «исполнителя» — гигантское волокно — выбрали мы); список панели «Исполнители» (все моторные и
+      нисходящие по таблице аннотаций); контур мозга (оформление по плотности точек, не анатомия). Подробно —
+      <a href="/docs/DECISIONS.md" target="_blank" rel="noopener">docs/DECISIONS.md</a>.</p>
+
+      <h3>Данные и авторы</h3>
+      <p>Коннектом, аннотации и формы нейронов FlyWire распространяются по лицензии
+      <a href="https://creativecommons.org/licenses/by/4.0/deed.ru" target="_blank" rel="noopener">CC&nbsp;BY&nbsp;4.0</a>
+      (можно использовать с указанием авторов). Авторы:</p>
+      <ul class="about-refs">
+        <li>Shiu P.K. et al. A Drosophila computational brain model reveals sensorimotor processing. <i>Nature</i> 634, 2024 —
+        <a href="https://doi.org/10.1038/s41586-024-07763-9" target="_blank" rel="noopener">статья</a>,
+        <a href="https://github.com/philshiu/Drosophila_brain_model" target="_blank" rel="noopener">код и файлы модели</a> (MIT).</li>
+        <li>Dorkenwald S. et al. Neuronal wiring diagram of an adult brain. <i>Nature</i>, 2024 —
+        <a href="https://doi.org/10.1038/s41586-024-07558-y" target="_blank" rel="noopener">статья</a> (коннектом FlyWire).</li>
+        <li>Schlegel P. et al. Whole-brain annotation and multi-connectome cell typing of Drosophila. <i>Nature</i>, 2024 —
+        <a href="https://doi.org/10.1038/s41586-024-07686-5" target="_blank" rel="noopener">статья</a>,
+        <a href="https://github.com/flyconnectome/flywire_annotations" target="_blank" rel="noopener">таблица аннотаций</a>.</li>
+        <li>Matsliah A. et al. Neuronal parts list and wiring diagram for a visual system. <i>Nature</i>, 2024 —
+        <a href="https://doi.org/10.1038/s41586-024-07981-1" target="_blank" rel="noopener">статья</a>.</li>
+        <li>Eckstein N. et al. Neurotransmitter classification from electron microscopy images at synaptic sites in Drosophila
+        melanogaster. <i>Cell</i>, 2024 — <a href="https://doi.org/10.1016/j.cell.2024.03.016" target="_blank" rel="noopener">статья</a> (медиаторы).</li>
+        <li>Buhmann J. et al. Automatic detection of synaptic partners in a whole-brain Drosophila electron microscopy data set.
+        <i>Nature Methods</i>, 2021 — <a href="https://doi.org/10.1038/s41592-021-01183-7" target="_blank" rel="noopener">статья</a> (поиск синапсов).</li>
+        <li>Heinrich L. et al. Synaptic cleft segmentation in non-isotropic volume electron microscopy of the complete Drosophila brain.
+        MICCAI, 2018 — <a href="https://doi.org/10.1007/978-3-030-00934-2_36" target="_blank" rel="noopener">статья</a> (поиск синапсов).</li>
+        <li>Формы нейронов (необязательно) — скелеты FlyWire 783,
+        <a href="https://zenodo.org/records/10877326" target="_blank" rel="noopener">zenodo.org/records/10877326</a>.</li>
+      </ul>
+
+      <h3>Код и лицензии</h3>
+      <p>Код FlyBrain — лицензия MIT. 3D-графика — three.js 0.170 (MIT). Данные и чужой код в проект не входят:
+      они скачиваются с проверкой контрольных сумм (<a href="/docs/DATA.md" target="_blank" rel="noopener">docs/DATA.md</a>).
+      Оригинальный код Shiu на Brian2 запускался только для проверки и не распространяется.</p>
+    </div>
+  </dialog>
 
   <div id="error" hidden></div>
   <script type="module" src="/web/main.js"></script>

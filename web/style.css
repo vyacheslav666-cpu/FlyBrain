@@ -63,6 +63,18 @@ html, body {
 }
 #help p { margin: 0 0 2px; }
 #help .credits { opacity: 0.75; }
+#about-open {
+  margin-left: 6px;
+  padding: 1px 9px;
+  background: rgba(12, 16, 26, 0.8);
+  color: #5ff0ff;
+  border: 1px solid rgba(95, 240, 255, 0.45);
+  border-radius: 12px;
+  font: inherit;
+  cursor: pointer;
+  pointer-events: auto; /* подсказка внизу мышь пропускает, а кнопка — нет */
+}
+#about-open:hover { background: rgba(95, 240, 255, 0.14); }
 
 #error {
   position: fixed;
@@ -521,4 +533,47 @@ body.panels-hidden #view .panel-body { padding: 0; overflow: visible; }
   .view-top { flex-direction: column-reverse; align-items: stretch; }
   #compass { align-self: flex-end; margin: 0 0 -4px; }
   .view-slider { grid-template-columns: 56px 1fr 40px; gap: 6px; }
+}
+
+/* ---------- окно «О проекте» (C13, D-039) ---------- */
+#about {
+  width: min(760px, calc(100vw - 32px));
+  max-height: calc(100vh - 48px);
+  padding: 0;
+  background: #0b0f19;
+  color: var(--text);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 12px;
+  color-scheme: dark;
+  font-size: 13.5px;
+  line-height: 1.5;
+}
+#about[open] { display: flex; flex-direction: column; }
+#about::backdrop { background: rgba(0, 0, 0, 0.6); }
+.about-head { display: flex; align-items: center; justify-content: space-between; padding: 14px 18px 10px; border-bottom: 1px solid rgba(255, 255, 255, 0.08); }
+.about-head h2 { margin: 0; font-size: 17px; font-weight: 600; }
+.about-close { padding: 0 6px; background: none; border: 0; color: var(--muted); font-size: 22px; line-height: 1; cursor: pointer; }
+.about-close:hover { color: var(--text); }
+.about-body { overflow-y: auto; padding: 4px 18px 18px; }
+.about-body h3 { margin: 18px 0 6px; color: var(--muted); font-size: 12.5px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em; }
+.about-body p { margin: 6px 0; }
+.about-body ul { margin: 6px 0; padding-left: 20px; }
+.about-body li { margin: 3px 0; }
+.about-body a { color: #5ff0ff; }
+.about-body code { font: 12px Consolas, monospace; }
+.about-muted { color: var(--muted); font-size: 12.5px; }
+.about-honesty { padding: 6px 10px; border-left: 2px solid #ffd166; background: rgba(255, 209, 102, 0.06); }
+.about-table { width: 100%; border-collapse: collapse; margin: 8px 0; font-size: 12.5px; }
+.about-table th { color: var(--muted); font-weight: 600; text-align: left; }
+.about-table th, .about-table td { padding: 3px 6px; border-bottom: 1px solid rgba(255, 255, 255, 0.07); vertical-align: top; }
+.about-key { font-weight: 600; white-space: nowrap; }
+.about-mark { white-space: nowrap; }
+.about-fail { color: #ff8b8b; }
+.about-boundary { color: #ffd166; }
+.about-info { color: var(--muted); }
+.about-verdicts li { margin: 5px 0; }
+.about-refs li { margin: 5px 0; }
+@media (max-width: 520px) {
+  .about-table th:nth-child(2), .about-table td:nth-child(2) { font-size: 12px; }
+  #about-open { margin: 4px 0 0; }
 }
