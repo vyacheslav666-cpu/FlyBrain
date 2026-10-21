@@ -220,8 +220,8 @@ span.partner-label { color: var(--muted); }
 #live button:disabled { opacity: 0.45; cursor: default; }
 .live-buttons { display: flex; gap: 8px; margin-bottom: 8px; }
 .live-buttons button { flex: 1; }
-#live .live-test { width: 100%; border-style: dashed; }
-#live .live-test[aria-pressed="true"] { background: rgba(255, 120, 90, 0.22); border-color: #ff7a5c; border-style: solid; }
+
+
 .live-rows { display: grid; grid-template-columns: auto 1fr; gap: 2px 12px; margin: 10px 0 0; }
 .live-rows dt { color: var(--muted); }
 .live-rows dd { margin: 0; text-align: right; font-variant-numeric: tabular-nums; }
@@ -236,3 +236,79 @@ span.partner-label { color: var(--muted); }
   font-size: 12px;
 }
 .live-rate { font-variant-numeric: tabular-nums; }
+
+/* ---------- панель стимулов и замедление показа (C10, D-034) ---------- */
+#legend h2 { margin: 0 0 8px; }
+#legend h2 button {
+  display: flex; width: 100%; justify-content: space-between; align-items: center;
+  padding: 0; border: 0; background: none; color: inherit; font: inherit; letter-spacing: inherit;
+  text-transform: inherit; cursor: pointer;
+}
+#legend h2 button:hover { color: var(--text); }
+#legend.collapsed h2 { margin-bottom: 0; }
+#legend.collapsed ul, #legend.collapsed #legend-note { display: none; }
+#legend.collapsed .chevron { transform: rotate(-90deg); }
+
+#stimuli {
+  color-scheme: dark; /* тёмная полоса прокрутки */
+  position: fixed;
+  left: 20px;
+  top: 70px;
+  width: 340px;
+  /* снизу — подсказка (72 px от края) и легенда */
+  max-height: calc(100vh - 70px - 72px - var(--legend-height, 0px) - 12px);
+  overflow-y: auto;
+  padding: 12px 14px;
+  background: var(--panel);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 10px;
+  backdrop-filter: blur(6px);
+  font-size: 13px;
+  line-height: 1.4;
+}
+#stimuli h2 { margin: 0 0 8px; font-size: 13px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: 0.06em; }
+.stim { padding: 8px 0; border-top: 1px solid rgba(255, 255, 255, 0.07); }
+.stim:first-of-type { border-top: 0; padding-top: 0; }
+.stim-head { display: flex; gap: 6px; }
+.stim button {
+  padding: 5px 10px;
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--text);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 8px;
+  font: inherit;
+  cursor: pointer;
+}
+.stim button:hover:not(:disabled) { background: rgba(255, 255, 255, 0.12); }
+.stim button:disabled { opacity: 0.45; cursor: default; }
+.stim-toggle { flex: 1; display: flex; align-items: center; gap: 8px; text-align: left; }
+.stim-toggle .stim-name { font-weight: 600; }
+.stim-toggle[aria-pressed="true"] { background: rgba(255, 120, 90, 0.22); border-color: #ff7a5c; }
+.stim-toggle[aria-pressed="true"] .stim-name::after { content: " — включён"; font-weight: 400; color: #ffb59f; }
+.stim-badge { margin-left: auto; padding: 1px 6px; border-radius: 6px; background: rgba(255, 196, 71, 0.16); color: #ffc247; font-size: 11px; }
+.stim-info-button { width: 34px; padding: 5px 0 !important; text-align: center; }
+.stim-info-button[aria-expanded="true"] { background: rgba(95, 240, 255, 0.16); border-color: #5ff0ff; }
+.stim-controls { display: flex; align-items: center; gap: 8px; margin-top: 6px; }
+.stim-hz { flex: 1; min-width: 0; accent-color: #ff7a5c; }
+.stim-hz-text { width: 46px; text-align: right; font-variant-numeric: tabular-nums; }
+.stim-sides { display: flex; }
+.stim-side { padding: 3px 8px !important; font-size: 12px; border-radius: 0 !important; }
+.stim-side:first-child { border-radius: 8px 0 0 8px !important; }
+.stim-side:last-child { border-radius: 0 8px 8px 0 !important; margin-left: -1px; }
+.stim-side:only-child { border-radius: 8px !important; }
+.stim-side[aria-pressed="true"] { background: rgba(95, 240, 255, 0.18); border-color: #5ff0ff; opacity: 1 !important; }
+.stim-sides.locked .stim-side { cursor: not-allowed; }
+.stim-note { margin: 4px 0 0; color: var(--muted); font-size: 11.5px; }
+.stim-note:empty { display: none; }
+.stim-info { margin-top: 6px; padding: 8px 10px; background: rgba(95, 240, 255, 0.07); border-left: 3px solid #5ff0ff; border-radius: 4px; font-size: 12px; }
+.stim-info p { margin: 0 0 6px; }
+.stim-info p:last-child { margin-bottom: 0; }
+.stim-info .honesty { color: #ffc247; }
+.stim-info .side-note { color: var(--muted); }
+.stim-footer { margin: 8px 0 0; color: var(--muted); font-size: 11.5px; }
+
+.live-slow { margin: 0 0 4px; }
+.live-slow-label { display: block; color: var(--muted); font-size: 12px; margin-bottom: 2px; }
+#live-slow { width: 100%; margin: 0; accent-color: #5ff0ff; }
+.live-slow-ends { display: flex; justify-content: space-between; color: var(--muted); font-size: 11.5px; }
+.live-slow-ends span:nth-child(2) { color: var(--text); }

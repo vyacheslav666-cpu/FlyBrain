@@ -49,6 +49,31 @@ stimuli:
       - {id: 720575940629176663, status: in_783}  # LB3b, sugar/low_salt, left
       - {id: 720575940611875570, status: in_783}  # LB3d, high_salt/heavy_metal, left
 
+  sugar_right:
+    name_ru: Сахар (правая сторона)
+    about_ru: >-
+      вкусовые нейроны сахара на хоботке, правая сторона мухи (список Shiu et al. 2024, рис. S1D;
+      в их коде он назван «left hemisphere», а по нынешней таблице аннотаций все эти нейроны правые, D-011)
+    honesty_ru: >-
+      Прямое включение нейронов, а не настоящий сахар. Список короче, чем для левой стороны:
+      в статье 10 нейронов (в 783 найдено 9) против 21 (20). Он есть у Shiu только в опыте рис. S1D
+      (сахар на правой стороне, частоты 20–200 Гц), остальные опыты статьи — на левой стороне.
+      По нынешней таблице 5 из 9 найденных — sugar, 4 — putative_attractive. Список статьи используем
+      как есть и ничего не добавляем по типам клеток (D-034). Замер C10 (30 повторов): при 100 Гц MN9 включается
+      слабо (левый 1,8, правый 4,1 Гц), при 200 Гц заметно (левый 48,5, правый 39,2 Гц).
+    paper: {file: figures.ipynb, name: neu_sugar_left}
+    paper_ids:
+      - {id: 720575940620589838, status: in_783}  # LB3c, sugar, right
+      - {id: 720575940631147148, status: in_783}  # LB3c, sugar, right
+      - {id: 720575940608305161, status: in_783}  # LB3c, sugar, right
+      - {id: 720575940629388135, status: in_783}  # LB3c, sugar, right
+      - {id: 720575940630968335, status: in_783}  # LB4b, putative_attractive, right
+      - {id: 720575940606801282, status: in_783}  # LB4b, putative_attractive, right
+      - {id: 720575940617398502, status: in_783}  # LB4b, putative_attractive, right
+      - {id: 720575940616167218, status: in_783}  # LB4b, putative_attractive, right
+      - {id: 720575940620296641, status: in_783}  # LB3c, sugar, right
+      - {id: 720575940627961104, status: not_in_783}  # в 783 не найден
+
   bitter:
     name_ru: Горечь
     about_ru: вкусовые нейроны горечи на хоботке, левая сторона мухи (список Shiu et al. 2024, рис. 3)

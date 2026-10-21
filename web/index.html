@@ -25,14 +25,25 @@
     <p id="search-status"></p>
   </div>
 
+  <section id="stimuli" hidden>
+    <h2>Стимулы</h2>
+    <div id="stimuli-list"></div>
+    <p class="stim-footer">Это прямое включение нейронов случайными импульсами, а не настоящие вкус, касание или тень.
+    Кнопка «ⓘ» показывает, какие нейроны включаются и откуда список. Можно включать несколько стимулов вместе.</p>
+  </section>
+
   <section id="live" hidden>
     <h2>Живой мозг</h2>
     <div class="live-buttons">
       <button id="live-pause" type="button" disabled>⏸ Пауза</button>
-      <button id="live-reset" type="button" disabled title="все нейроны — в покой, время модели — с нуля; включённый тест остаётся">↺ Сброс</button>
+      <button id="live-reset" type="button" disabled title="все нейроны — в покой, время модели — с нуля; включённые стимулы остаются">↺ Сброс</button>
     </div>
-    <button id="live-test" type="button" class="live-test" aria-pressed="false" disabled>Тест: сахар 100 Гц</button>
-    <p id="live-test-note" class="live-note"></p>
+    <div class="live-slow">
+      <label for="live-slow" class="live-slow-label">Скорость показа</label>
+      <input id="live-slow" type="range" min="0" max="100" step="1" value="100" disabled
+             aria-describedby="live-slow-text">
+      <div class="live-slow-ends"><span>0,02×</span><span id="live-slow-text">максимум</span><span>максимум</span></div>
+    </div>
     <dl class="live-rows">
       <dt>Скорость</dt><dd id="live-speed">—</dd>
       <dt>Время модели</dt><dd id="live-time">—</dd>
@@ -47,7 +58,7 @@
   <div id="tooltip" hidden></div>
 
   <aside id="legend" hidden>
-    <h2>Классы нейронов</h2>
+    <h2><button id="legend-toggle" type="button" aria-expanded="true" title="свернуть или развернуть">Классы нейронов <span class="chevron" aria-hidden="true">▾</span></button></h2>
     <ul id="legend-list"></ul>
     <p id="legend-note"></p>
   </aside>

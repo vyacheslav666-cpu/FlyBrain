@@ -1,12 +1,16 @@
-"""«Живой» мозг (C9): один повтор модели в отдельном потоке, кадры спайков ~25 раз в секунду (D-015, D-033).
+"""«Живой» мозг (C9, C10): один повтор модели в отдельном потоке, кадры спайков ~25 раз в секунду (D-015, D-033, D-034).
 
 Поток считает движок блоками по 18 шагов (D-008) и примерно каждые 40 мс настоящего времени собирает кадр:
 какие нейроны выстрелили с прошлого кадра и сколько раз. Кадры и сообщения о состоянии уходят подписчикам
-(сервер передаёт их страницам по WebSocket). Команды (пауза, продолжить, сброс, тест) приходят из других
-потоков и выполняются между блоками: движок трогает только этот поток.
+(сервер передаёт их страницам по WebSocket). Команды (пауза, продолжить, сброс, стимулы, замедление) приходят
+из других потоков и выполняются между блоками: движок трогает только этот поток.
+
+Замедление показа (C10) только делает паузы между блоками: каждый блок и каждый шаг по 0,1 мс считается,
+ничего не пропускается.
 """
 
 import json
+import math
 import queue
 import struct
 import threading
@@ -18,6 +22,7 @@ import numpy as np
 import torch
 
 from flybrain.engine import Engine
+from flybrain.stimuli import DEFAULT_HZ, DEFAULT_SIDE, MAX_HZ
 
 FRAME_FORMAT = 1
 # Заголовок кадра: версия, номер «эпохи» (растёт при сбросе), начало и конец кадра в мс модели,
@@ -26,9 +31,11 @@ FRAME_FORMAT = 1
 FRAME_HEADER = struct.Struct("<IIddfI")
 FRAME_SECONDS = 0.04  # ~25 кадров в секунду
 MAX_SPEED = 1.0  # быстрее реального времени не считаем: живой режим показывает время мухи как есть
+MAX_SLEEP_SECONDS = 0.05  # дольше без проверки команд страницы не спим
 SPEED_WINDOW_SECONDS = 2.0  # скорость — среднее за последние 2 с счёта
-TEST_STIMULUS = "test_sugar"
-TEST_HZ = 100.0
+# Ползунок замедления: цель — от SLOW_MIN до 1× реального времени; «без замедления» — цель не задана.
+SLOW_MIN = 0.02
+SLOW_SLIDER_MAX = 0.4  # последнее деление ползунка перед «максимум» (на этой машине модель и так идёт ~0,48×)
 
 
 def encode_frame(epoch: int, start_ms: float, end_ms: float, speed: float, neurons: np.ndarray,
@@ -58,16 +65,20 @@ class LiveSim:
     """Один повтор модели Shiu, который считается, пока открыта хотя бы одна страница.
 
     `make_engine` строит движок (это долго, поэтому — в потоке и только когда пришла первая страница).
-    `test_neurons` — нейроны временной кнопки «тест» (сахар, C9).
+    `stimuli` — кнопки-стимулы: ключ → сторона мухи → номера нейронов (`flybrain.stimuli.build_catalog`).
     Подписчик — функция, которой поток отдаёт кадры (`bytes`) и состояние (`str` с JSON).
     """
 
-    def __init__(self, make_engine: Callable[[], Engine], test_neurons, test_label: str = "сахар",
-                 test_about: str = "", frame_seconds: float = FRAME_SECONDS, max_speed: float | None = MAX_SPEED):
+    def __init__(self, make_engine: Callable[[], Engine], stimuli: dict[str, dict[str, np.ndarray]],
+                 frame_seconds: float = FRAME_SECONDS, max_speed: float | None = MAX_SPEED):
         self._make_engine = make_engine
-        self._test_neurons = np.asarray(test_neurons, dtype=np.int64)
-        self._test_label = test_label
-        self._test_about = test_about
+        self._stimuli = {key: {side: np.asarray(ids, dtype=np.int64) for side, ids in sides.items()}
+                         for key, sides in stimuli.items()}
+        # Что сейчас включено: ключ → {on, hz, side}. Меняет только поток расчёта.
+        self._stimulus_state = {key: {"on": False, "hz": DEFAULT_HZ, "side": DEFAULT_SIDE} for key in self._stimuli}
+        self._target_speed: float | None = None  # None — без замедления
+        self._anchor: tuple[float, float] | None = None  # (настоящее время, время модели), от которых считаем темп
+        self._block_ms: float | None = None  # сколько мс модели в одном блоке (узнаём по первому блоку)
         self._frame_seconds = frame_seconds
         self._max_speed = max_speed
         self._commands: queue.Queue = queue.Queue()
@@ -81,7 +92,6 @@ class LiveSim:
         self._speed_samples: deque = deque()
         self._state = "waiting"  # waiting → starting → running / paused; error — движок не построился
         self._paused = False
-        self._test_on = False
         self._epoch = 0
         self._speed = 0.0
         self._device = ""
@@ -110,15 +120,59 @@ class LiveSim:
             self._subscribers.discard(send)
 
     def command(self, message: dict) -> None:
-        """Команда страницы: {"cmd": "pause" | "resume" | "reset"} или {"cmd": "test", "on": true/false}."""
-        if message.get("cmd") in ("pause", "resume", "reset", "test"):
-            self._commands.put(message)
+        """Команда страницы (кривые команды молча отбрасываются):
+
+        - {"cmd": "pause" | "resume" | "reset"};
+        - {"cmd": "stimulus", "key": "sugar", "on": true, "hz": 100, "side": "left"}: любое из on, hz, side можно не указывать;
+        - {"cmd": "speed", "value": 0.05}: показ в 0,05× реального времени; "value": null — без замедления.
+        """
+        cmd = message.get("cmd")
+        if cmd in ("pause", "resume", "reset"):
+            clean = {"cmd": cmd}
+        elif cmd == "stimulus":
+            clean = self._clean_stimulus(message)
+        elif cmd == "speed":
+            clean = self._clean_speed(message)
+        else:
+            clean = None
+        if clean is not None:
+            self._commands.put(clean)
             self._wake.set()
 
+    def _clean_stimulus(self, message: dict) -> dict | None:
+        key = message.get("key")
+        sides = self._stimuli.get(key) if isinstance(key, str) else None
+        if sides is None:
+            return None
+        clean: dict = {"cmd": "stimulus", "key": key}
+        if "on" in message:
+            if not isinstance(message["on"], bool):
+                return None
+            clean["on"] = message["on"]
+        if "hz" in message:
+            hz = message["hz"]
+            if isinstance(hz, bool) or not isinstance(hz, (int, float)) or not math.isfinite(hz):
+                return None
+            clean["hz"] = min(max(float(hz), 0.0), MAX_HZ)
+        if "side" in message:
+            if message["side"] not in sides:  # стороны без списка из статьи у стимула нет, выбрать её нельзя (D-034)
+                return None
+            clean["side"] = message["side"]
+        return clean
+
+    @staticmethod
+    def _clean_speed(message: dict) -> dict | None:
+        value = message.get("value")
+        if value is None:
+            return {"cmd": "speed", "value": None}
+        if isinstance(value, bool) or not isinstance(value, (int, float)) or not math.isfinite(value):
+            return None
+        return {"cmd": "speed", "value": min(max(float(value), SLOW_MIN), 1.0)}
+
     def status(self) -> dict:
-        return {"type": "status", "state": self._state, "paused": self._paused, "test": self._test_on,
-                "test_label": self._test_label, "test_about": self._test_about,
-                "test_count": len(self._test_neurons), "test_hz": TEST_HZ,
+        return {"type": "status", "state": self._state, "paused": self._paused,
+                "stimuli": {key: dict(state) for key, state in self._stimulus_state.items()},
+                "target_speed": self._target_speed, "slow_min": SLOW_MIN, "slow_slider_max": SLOW_SLIDER_MAX,
                 "epoch": self._epoch, "time_ms": self.engine.time_ms if self.engine else 0.0,
                 "speed": self._speed, "max_speed": self._max_speed, "device": self._device,
                 "message": self._message}
@@ -147,6 +201,7 @@ class LiveSim:
             if not self._has_subscribers():
                 # Никто не смотрит — видеокарту не греем. Состояние модели сохраняется до следующей страницы.
                 self._speed_samples.clear()
+                self._anchor = None
                 self._wake.wait(0.5)
                 self._wake.clear()
                 continue
@@ -157,6 +212,7 @@ class LiveSim:
                 self._broadcast(self.status_json())
             if self._paused:
                 self._speed_samples.clear()
+                self._anchor = None
                 self._wake.wait(0.5)
                 self._wake.clear()
                 continue
@@ -188,36 +244,79 @@ class LiveSim:
                 self._paused = True
             elif cmd == "resume":
                 self._paused = False
+                self._anchor = None
             elif cmd == "reset":
-                # Все нейроны в покой, время 0. Включённый тест остаётся включённым (как стимулы в движке).
+                # Все нейроны в покой, время 0. Включённые стимулы остаются включёнными (как в движке).
                 self.engine.reset()
                 self._prev_counts.zero_()
                 self._epoch += 1
                 self._speed_samples.clear()
-            elif cmd == "test":
-                self._test_on = bool(message.get("on"))
-                if self._test_on:
-                    self.engine.set_stimulus(TEST_STIMULUS, self._test_neurons, TEST_HZ)
-                else:
-                    self.engine.remove_stimulus(TEST_STIMULUS)
+                self._anchor = None
+            elif cmd == "stimulus":
+                self._apply_stimulus(message)
+            elif cmd == "speed":
+                self._target_speed = message["value"]
+                self._speed_samples.clear()  # счётчик скорости должен показывать новый темп, а не смесь со старым
+                self._anchor = None
             self._state = "paused" if self._paused else "running"
             changed = True
+
+    def _apply_stimulus(self, message: dict) -> None:
+        key = message["key"]
+        state = self._stimulus_state[key]
+        for field in ("on", "hz", "side"):
+            if field in message:
+                state[field] = message[field]
+        if state["on"]:
+            self.engine.set_stimulus(key, self._stimuli[key][state["side"]], state["hz"])
+        else:
+            self.engine.remove_stimulus(key)
+
+    def _speed_limit(self) -> float | None:
+        """Быстрее какого темпа идти нельзя: цель ползунка и «не быстрее реального времени» (D-017, D-033)."""
+        limits = [x for x in (self._target_speed, self._max_speed) if x]
+        return min(limits) if limits else None
+
+    def _seconds_until_next_block(self, limit: float, now: float) -> float:
+        """Сколько ждать до следующего блока, чтобы время модели не обгоняло настоящее, умноженное на `limit`."""
+        engine = self.engine
+        if self._anchor is None:
+            self._anchor = (now, engine.time_ms)
+        wall0, model0 = self._anchor
+        behind_ms = model0 + (now - wall0) * 1000.0 * limit - engine.time_ms
+        if behind_ms > (self._block_ms or 0.0):
+            # Видеокарта не успевала (или была пауза): долг не копим, иначе потом был бы рывок быстрее лимита.
+            self._anchor = (now, engine.time_ms)
+            return 0.0
+        return max(0.0, -behind_ms / (1000.0 * limit))
 
     def _run_frame(self) -> None:
         engine = self.engine
         started = time.perf_counter()
         start_ms = engine.time_ms
-        frame_ms = self._frame_seconds * 1000.0
-        limit_ms = frame_ms * self._max_speed if self._max_speed else None
+        limit = self._speed_limit()
         while True:
+            now = time.perf_counter()
+            wait = self._seconds_until_next_block(limit, now) if limit else 0.0
+            if wait > 0:
+                # Впереди графика. Если кадр уже что-то посчитал и кончится раньше, чем понадобится следующий блок,
+                # ждём до конца кадра и отправляем его; иначе ждём блок.
+                remaining = self._frame_seconds - (now - started)
+                last = engine.time_ms > start_ms and remaining <= wait
+                # sleep, а не Event.wait: на Windows тот ждёт кратно ~15 мс, а блоки идут чаще. Спим кусками,
+                # чтобы команда страницы (пауза, сброс, ползунок) не ждала дольше MAX_SLEEP_SECONDS.
+                time.sleep(max(0.0, min(remaining if last else wait, MAX_SLEEP_SECONDS)))
+                if last or not self._commands.empty():
+                    break
+                continue
+            before = engine.time_ms
             engine.run_steps(engine.block_steps)
             engine.synchronize()  # иначе процессор убежит вперёд и кадр не будет соответствовать времени
+            self._block_ms = engine.time_ms - before
             if time.perf_counter() - started >= self._frame_seconds:
                 break
-            if limit_ms is not None and engine.time_ms - start_ms >= limit_ms:
-                # Быстрее реального времени не идём: ждём до конца кадра.
-                time.sleep(max(0.0, self._frame_seconds - (time.perf_counter() - started)))
-                break
+        if engine.time_ms == start_ms:
+            return  # ничего не посчитано (пришла команда): пустой кадр не отправляем
         counts = engine.counts[:, 0]
         delta = counts - self._prev_counts
         fired = torch.nonzero(delta).flatten()

@@ -101,3 +101,5 @@ def test_server_serves_page_data_and_scripts():
         script = client.get("/web/main.js")
         assert script.status_code == 200 and "javascript" in script.headers["content-type"]
         assert client.get("/web/vendor/three.module.js").status_code == 200
+        # Файлы страницы всегда сверяются с сервером: иначе после обновления браузер мог бы взять старый код.
+        assert script.headers["cache-control"] == "no-cache"

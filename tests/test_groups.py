@@ -107,7 +107,8 @@ def test_group_config_matches_decisions():
     config = load_group_config()
     assert set(config) == set(SECTIONS)
     # Длины списков статьи — из D-012 и D-014 (номера версии 630).
-    expected = {"sugar": 21, "bitter": 21, "water": 18, "ir94e": 18, "jon_ce": 70, "jon_f": 60, "jon_dm": 16}
+    expected = {"sugar": 21, "sugar_right": 10, "bitter": 21, "water": 18, "ir94e": 18, "jon_ce": 70, "jon_f": 60,
+                "jon_dm": 16}
     for key, total in expected.items():
         entries = config["stimuli"][key]["paper_ids"]
         assert len(entries) == total, key

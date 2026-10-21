@@ -14,7 +14,7 @@ from fastapi import FastAPI, HTTPException, Query, WebSocket, WebSocketDisconnec
 from fastapi.responses import FileResponse, JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
 
-from flybrain import live, processed, webdata
+from flybrain import live, processed, stimuli, webdata
 from flybrain.engine import Engine
 from flybrain.lookup import NeuronLookup
 from flybrain.paths import PROCESSED_DIR, PROJECT_ROOT
@@ -32,6 +32,15 @@ CODE_VERSION = code_version()
 mimetypes.add_type("text/javascript", ".js")
 
 
+class NoCacheStaticFiles(StaticFiles):
+    """Файлы страницы всегда сверяются с сервером: иначе браузер мог бы показать новый сервер со старым кодом страницы."""
+
+    async def get_response(self, path, scope):
+        response = await super().get_response(path, scope)
+        response.headers["Cache-Control"] = "no-cache"
+        return response
+
+
 LIVE_QUEUE_FRAMES = 100  # ~4 с кадров: если страница не успевает их забирать, лишние выбрасываются
 
 
@@ -47,11 +56,12 @@ def create_app(processed_dir=PROCESSED_DIR, web_dir=WEB_DIR) -> FastAPI:
         state["cloud"] = webdata.build_cloud_gzip(neurons, legend)
         state["meta"] = webdata.build_meta(neurons, legend, names)
         state["lookup"] = NeuronLookup(neurons, connectivity, names, legend)
-        # Живой мозг (C9): один повтор на видеокарте. Движок строится, только когда откроется первая страница.
-        sugar = processed.load_groups(processed_dir)["stimuli"]["sugar"]
+        # Кнопки-стимулы (C10) и живой мозг (C9): один повтор на видеокарте. Движок строится, только когда откроется первая страница.
+        state["stimuli"], stimulus_indices = stimuli.build_catalog(processed.load_groups(processed_dir),
+                                                                   stimuli.load_buttons())
         state["live"] = live.LiveSim(
             lambda: Engine(connectivity["indptr"], connectivity["indices"], connectivity["weight"], n_trials=1),
-            sugar["indices"], test_label=sugar["name_ru"], test_about=sugar["about_ru"])
+            stimulus_indices)
         state["live"].start()
         yield
         state["live"].stop()
@@ -78,6 +88,10 @@ def create_app(processed_dir=PROCESSED_DIR, web_dir=WEB_DIR) -> FastAPI:
             media_type="application/octet-stream",
             headers={"Content-Encoding": "gzip", "Cache-Control": "no-cache"},
         )
+
+    @app.get("/api/stimuli")
+    def stimulus_panel() -> JSONResponse:
+        return JSONResponse(state["stimuli"], headers={"Cache-Control": "no-cache"})
 
     def known_neuron(index: int) -> NeuronLookup:
         lookup = state["lookup"]
@@ -137,7 +151,7 @@ def create_app(processed_dir=PROCESSED_DIR, web_dir=WEB_DIR) -> FastAPI:
             sender.cancel()
             await asyncio.gather(sender, return_exceptions=True)
 
-    app.mount("/web", StaticFiles(directory=web_dir), name="web")
+    app.mount("/web", NoCacheStaticFiles(directory=web_dir), name="web")
     return app
 
 

@@ -41,6 +41,10 @@ def test_groups_as_in_plan(neurons):
     assert stimuli["antenna"]["count"] == 145
     assert stimuli["shadow_left"]["count"] == 162 and stimuli["shadow_right"]["count"] == 152
     assert set(neurons["side"].iloc[stimuli["sugar"]["indices"]]) == {"left"}
+    # D-034: правый сахар — список статьи из figures.ipynb (ячейка 76), у Shiu он назван «left hemisphere»;
+    # по таблице аннотаций все его нейроны правые.
+    assert stimuli["sugar_right"]["count"] == 9 and stimuli["sugar_right"]["paper_total"] == 10
+    assert set(neurons["side"].iloc[stimuli["sugar_right"]["indices"]]) == {"right"}
     assert sorted(readouts["MN9"]["root_ids"]) == ["720575940618238523", "720575940660219265"]
     assert readouts["motor_all"]["count"] == 110 and readouts["descending_all"]["count"] == 1299
 

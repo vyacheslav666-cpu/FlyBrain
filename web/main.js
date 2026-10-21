@@ -8,7 +8,9 @@ import { createCard, createSearch, createTooltip, getInfo, getLinks, RATE_HINT }
 import { connectLive } from "./live.js";
 import { createLinks, createRings } from "./markers.js";
 import { createPicker } from "./picking.js";
+import { createStimulusPanel } from "./stimuli.js";
 
+const LEGEND_OPEN_MIN_HEIGHT = 1100; // на экранах ниже этого легенда сначала свёрнута
 const MIN_POINT_PX = 1.3;
 const MAX_POINT_PX = 7;
 const POINT_ALPHA = 0.22; // ниже, чем хотелось бы глазу: иначе плотные зрительные доли «выгорают» в белое
@@ -31,14 +33,17 @@ function formatNumber(number, digits) {
 }
 
 async function loadData() {
-  const [metaResponse, cloudResponse] = await Promise.all([fetch("/api/meta"), fetch("/api/cloud.bin")]);
-  if (!metaResponse.ok || !cloudResponse.ok) throw new Error("сервер не отдал данные нейронов");
+  const [metaResponse, cloudResponse, stimuliResponse] =
+    await Promise.all([fetch("/api/meta"), fetch("/api/cloud.bin"), fetch("/api/stimuli")]);
+  if (!metaResponse.ok || !cloudResponse.ok || !stimuliResponse.ok) throw new Error("сервер не отдал данные нейронов");
   const meta = await metaResponse.json();
+  const stimuli = await stimuliResponse.json();
   const buffer = await cloudResponse.arrayBuffer();
   const [count, version] = new Uint32Array(buffer, 0, 2);
   if (version !== meta.format || count !== meta.total) throw new Error("данные нейронов не подходят к странице");
   return {
     meta,
+    stimuli,
     positions: new Float32Array(buffer, HEADER_BYTES, count * 3),
     classes: new Uint8Array(buffer, HEADER_BYTES + count * 12, count),
   };
@@ -130,7 +135,19 @@ function buildLegend(meta) {
   document.getElementById("legend-note").textContent =
     `Точка — тело клетки (${formatInt(meta.soma)}) или, если тела нет в данных, ` +
     `точка на отростке внутри мозга (${formatInt(meta.anchor)}).${hiddenNote}`;
-  document.getElementById("legend").hidden = false;
+  const legend = document.getElementById("legend");
+  legend.hidden = false;
+  // Легенду можно свернуть: слева над ней стоит панель стимулов, которой нужно место. На низких экранах она свёрнута.
+  const toggle = document.getElementById("legend-toggle");
+  const setCollapsed = (collapsed) => {
+    legend.classList.toggle("collapsed", collapsed);
+    toggle.setAttribute("aria-expanded", String(!collapsed));
+  };
+  setCollapsed(window.innerHeight < LEGEND_OPEN_MIN_HEIGHT);
+  toggle.addEventListener("click", () => setCollapsed(!legend.classList.contains("collapsed")));
+  new ResizeObserver(() => {
+    document.documentElement.style.setProperty("--legend-height", `${legend.offsetHeight}px`);
+  }).observe(legend);
 }
 
 
@@ -140,18 +157,60 @@ const CLICK_MAX_MOVE_PX = 5; // сдвиг мыши больше этого — 
 const FLIGHT_MS = 900;
 const LIVE_TEXT_EVERY_MS = 250; // как часто обновлять цифры живого режима (скорость, частоты)
 
-/** Панель «Живой мозг»: кнопки, скорость (D-017), плашка «в покое мозг молчит» (D-019). */
-function createLivePanel(onCommand) {
+const SLIDER_OFF = 100; // последнее деление ползунка замедления — «максимум», без замедления
+const SLIDER_STEPS = SLIDER_OFF - 1; // деления 0…99 — от самой медленной цели до slow_slider_max, по логарифму
+const SLOW_SEND_EVERY_MS = 100;
+
+/** Цель замедления (доля реального времени) по положению ползунка; `null` — без замедления. */
+function speedFromSlider(position, status) {
+  if (position >= SLIDER_OFF) return null;
+  const { slow_min: min, slow_slider_max: max } = status;
+  return Number((min * (max / min) ** (position / SLIDER_STEPS)).toPrecision(2));
+}
+
+function sliderFromSpeed(speed, status) {
+  if (speed === null) return SLIDER_OFF;
+  const { slow_min: min, slow_slider_max: max } = status;
+  return Math.min(SLIDER_STEPS, Math.max(0, Math.round((SLIDER_STEPS * Math.log(speed / min)) / Math.log(max / min))));
+}
+
+function formatSpeed(speed) {
+  return speed.toLocaleString("ru-RU", { maximumFractionDigits: speed < 0.1 ? 3 : 2 });
+}
+
+/**
+ * Панель «Живой мозг»: кнопки, ползунок замедления показа, скорость (D-017), плашка «в покое мозг молчит» (D-019).
+ * `anyStimulus()` говорит, включён ли хоть один стимул.
+ */
+function createLivePanel(onCommand, anyStimulus) {
   const $ = (id) => document.getElementById(id);
   const pause = $("live-pause");
   const reset = $("live-reset");
-  const test = $("live-test");
+  const slow = $("live-slow");
   let status = null;
   let connected = false;
 
   pause.addEventListener("click", () => onCommand({ cmd: status?.paused ? "resume" : "pause" }));
   reset.addEventListener("click", () => onCommand({ cmd: "reset" }));
-  test.addEventListener("click", () => onCommand({ cmd: "test", on: !status?.test }));
+  // Ползунок шлёт команды не чаще 10 раз в секунду, но последнее значение не теряет.
+  let slowTimer = null;
+  let slowSentAt = 0;
+  function sendSlow() {
+    slowTimer = null;
+    slowSentAt = performance.now();
+    onCommand({ cmd: "speed", value: speedFromSlider(Number(slow.value), status) });
+  }
+  slow.addEventListener("input", () => {
+    if (!status) return;
+    $("live-slow-text").textContent = slowText(speedFromSlider(Number(slow.value), status));
+    const wait = SLOW_SEND_EVERY_MS - (performance.now() - slowSentAt);
+    if (wait <= 0) sendSlow();
+    else if (slowTimer === null) slowTimer = setTimeout(sendSlow, wait);
+  });
+
+  function slowText(target) {
+    return target === null ? "без замедления" : `цель ${formatSpeed(target)}×`;
+  }
 
   function stateText() {
     if (!connected) return "Нет связи с сервером: подключаюсь снова…";
@@ -167,25 +226,23 @@ function createLivePanel(onCommand) {
 
   function refresh() {
     const ready = connected && status && (status.state === "running" || status.state === "paused");
-    pause.disabled = reset.disabled = test.disabled = !ready;
-    pause.textContent = status?.paused ? "▶ Продолжить" : "⏸ Пауза";
-    test.setAttribute("aria-pressed", String(Boolean(status?.test)));
-    if (status) {
-      test.textContent = `Тест: ${status.test_label.toLowerCase()} ${formatInt(status.test_hz)} Гц` +
-        (status.test ? " — выключить" : "");
-      $("live-test-note").textContent =
-        `Временная кнопка: ${status.test_count} нейронов — ${status.test_about}. ` +
-        "Прямое включение нейронов случайными импульсами, как в статье, а не настоящий сахар.";
+    pause.disabled = reset.disabled = slow.disabled = !ready;
+    if (status && document.activeElement !== slow) {
+      slow.value = String(sliderFromSpeed(status.target_speed, status));
+      $("live-slow-text").textContent = slowText(status.target_speed);
     }
-    $("live-quiet").hidden = Boolean(status?.test);
+    $("live-quiet").hidden = anyStimulus();
     $("live-state").textContent = stateText();
     const running = ready && status.state === "running";
     const speed = status?.speed ?? 0;
-    $("live-speed").textContent = running && speed > 0 ? `${formatNumber(speed, 2)}× реального времени` : "—";
+    $("live-speed").textContent = running && speed > 0 ? `${formatNumber(speed, speed < 0.1 ? 3 : 2)}× реального времени` : "—";
     $("live-speed-note").textContent = running && speed > 0
-      ? (status.max_speed && speed > 0.98 * status.max_speed
-        ? "Видеокарта успевает быстрее, но модель нарочно идёт не быстрее реального времени."
-        : `1 с жизни мухи считается ${formatNumber(1 / speed, 1)} с; шаги по 0,1 мс не пропускаем.`)
+      ? (status.target_speed !== null
+        ? `Замедлено ползунком: 1 с жизни мухи считается ${formatNumber(1 / speed, 1)} с. Шаги по 0,1 мс считаются ` +
+          "все; показ идёт блоками по 1,8 мс — за столько сигнал доходит от нейрона к соседу."
+        : (status.max_speed && speed > 0.98 * status.max_speed
+          ? "Видеокарта успевает быстрее, но модель нарочно идёт не быстрее реального времени."
+          : `1 с жизни мухи считается ${formatNumber(1 / speed, 1)} с; шаги по 0,1 мс не пропускаем.`))
       : "";
     $("live-time").textContent = status ? `${formatNumber(status.time_ms / 1000, 2)} с` : "—";
   }
@@ -204,7 +261,7 @@ function createLivePanel(onCommand) {
   };
 }
 
-function start({ meta, positions, classes }) {
+function start({ meta, stimuli, positions, classes }) {
   const canvas = document.getElementById("scene");
   const renderer = new THREE.WebGLRenderer({ canvas, antialias: false, alpha: false });
   renderer.setClearColor(0x05070d, 1);
@@ -433,13 +490,20 @@ function start({ meta, positions, classes }) {
   resize();
 
   // ---------- живой мозг ----------
-  const panel = createLivePanel((command) => live.send(command));
+  const stimulusPanel = createStimulusPanel(stimuli, (command) => live.send(command));
+  const panel = createLivePanel((command) => live.send(command), () => stimulusPanel.anyOn);
   const live = connectLive({
     count: classes.length,
     onFrame: (neurons, spikes) => glow.spike(neurons, spikes),
-    onStatus: (status) => panel.setStatus(status),
+    onStatus: (status) => {
+      stimulusPanel.setStatus(status);
+      panel.setStatus(status);
+    },
     onReset: () => glow.clear(),
-    onConnection: (connected) => panel.setConnected(connected),
+    onConnection: (connected) => {
+      stimulusPanel.setConnected(connected);
+      panel.setConnected(connected);
+    },
   });
 
   function rateText(index) {
