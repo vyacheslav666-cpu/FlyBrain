@@ -5,7 +5,7 @@
    с другим зерном случайных чисел. Результаты сохраняются в `data/validation/` и при следующем запуске
    берутся оттуда, если не изменились код движка, связи и условия.
 3. Проверяет пункты А (движок против эталона, пороги D-018), Б1–Б7 (выводы статьи; одни и те же правила
-   для эталона и для движка), В (тень, без порога) и Д1 (добавлен после эталона). Правила — D-031.
+   для эталона и для движка), В (тень, без порога), Д1 и Д2 (добавлены после эталона). Правила — D-031, D-032.
 4. Пишет `docs/VALIDATION.md` и картинки в `docs/validation/` (модуль `flybrain.report`).
 """
 
@@ -425,8 +425,9 @@ def check_b1(facts: Facts) -> Verdict:
 
 
 def check_b2(facts: Facts) -> Verdict:
-    counts = {f: facts.responders(key) for f, key in B2_CONDITIONS.items()}
-    with_stim = {f: facts.responders(key, with_stimulated=True) for f, key in B2_CONDITIONS.items()}
+    # Основной счёт — вместе со стимулируемыми: так считает get_rate у Shiu (D-032); без них — для справки.
+    counts = {f: facts.responders(key, with_stimulated=True) for f, key in B2_CONDITIONS.items()}
+    without = {f: facts.responders(key) for f, key in B2_CONDITIONS.items()}
     active = {f: facts.responders(key, above_zero=False) for f, key in B2_CONDITIONS.items()}
     freqs = sorted(counts)
     growth = min(counts[b] - counts[a] for a, b in zip(freqs, freqs[1:]))
@@ -438,10 +439,10 @@ def check_b2(facts: Facts) -> Verdict:
         [Check("при 10 Гц — десятки (10–99)", min(counts[10] - 10, 99 - counts[10])),
          Check("при 200 Гц — сотни (100–999)", min(counts[200] - 100, 999 - counts[200])),
          Check("число растёт с каждой частотой", growth, strict=True)],
-        [f"откликнулось (> 0 Гц, без стимулируемых): {row(counts)}",
-         f"то же вместе со стимулируемыми: {row(with_stim)}",
-         f"для сравнения, по правилу D-018 (≥ 1 Гц, без стимулируемых): {row(active)}"],
-        {"counts": counts, "with_stimulated": with_stim, "active": active})
+        [f"откликнулось (> 0 Гц, вместе со стимулируемыми): {row(counts)}",
+         f"для справки, без стимулируемых: {row(without)}",
+         f"для справки, по правилу D-018 (≥ 1 Гц, без стимулируемых): {row(active)}"],
+        {"counts": counts, "without_stimulated": without, "active": active})
 
 
 def check_b3(facts: Facts) -> Verdict:
@@ -537,6 +538,19 @@ def check_d1(facts: Facts) -> Verdict:
         values)
 
 
+def check_d2(facts: Facts) -> Verdict:
+    condition = "water_200hz"
+    mn9 = facts.key("MN9")
+    other = facts.key("MN9", "left" if mn9.side == "right" else "right")
+    mean, se = facts.rate(condition, mn9)
+    return Verdict(
+        [active_test("MN9 из статьи активен (≥ 1 Гц)", facts, condition, mn9)],
+        [f"MN9 из статьи ({side_ru(mn9)}) — {hz(mean, se)}; для справки, MN9 {side_ru(other)} — "
+         f"{hz(*facts.rate(condition, other))}"],
+        {"MN9 Л": facts.rate(condition, facts.key("MN9", "left")),
+         "MN9 П": facts.rate(condition, facts.key("MN9", "right"))})
+
+
 @dataclass(frozen=True)
 class Item:
     key: str
@@ -558,6 +572,7 @@ ITEMS = (
     Item("В", "Тень (LPLC2 + LC4, левая сторона) → гигантское волокно", ("shadow_left_100hz",), check_v),
     Item("Д1", "Сахар 40 и вода 40 Гц по отдельности MN9 почти не включают, а вместе включают",
          ("sugar_40hz_water_0hz", "sugar_0hz_water_40hz", "sugar_40hz_water_40hz"), check_d1),
+    Item("Д2", "Вода 200 Гц → MN9 активен", ("water_200hz",), check_d2),
 )
 
 

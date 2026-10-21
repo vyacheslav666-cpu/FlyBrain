@@ -13,8 +13,8 @@ PLAN_CONDITIONS = {
     "sugar_10hz", "sugar_50hz", "sugar_100hz", "sugar_200hz", "sugar_100hz_bitter_200hz", "water_100hz",
     "antenna_100hz", "jon_ce_100hz", "jon_f_100hz", "shadow_left_100hz", "sugar_100hz_shuffled",
 }
-# Добавлены в C6 после того, как увидели эталон (пункт Д1, D-031).
-ADDED_CONDITIONS = {"sugar_40hz_water_0hz", "sugar_0hz_water_40hz", "sugar_40hz_water_40hz"}
+# Добавлены после того, как увидели эталон: пункт Д1 (D-031) и пункт Д2 (D-032).
+ADDED_CONDITIONS = {"sugar_40hz_water_0hz", "sugar_0hz_water_40hz", "sugar_40hz_water_40hz", "water_200hz"}
 
 
 def test_config_has_plan_conditions():
@@ -29,6 +29,7 @@ def test_config_has_plan_conditions():
     assert [(by_key[key].excite_group, by_key[key].excite_hz, by_key[key].excite2_group, by_key[key].excite2_hz)
             for key in ("sugar_40hz_water_0hz", "sugar_0hz_water_40hz", "sugar_40hz_water_40hz")] == [
         ("sugar", 40, "water", 0), ("sugar", 0, "water", 40), ("sugar", 40, "water", 40)]
+    assert (by_key["water_200hz"].excite_group, by_key["water_200hz"].excite_hz, by_key["water_200hz"].excite2_group)         == ("water", 200, None)
     mixed = by_key["sugar_100hz_bitter_200hz"]
     assert (mixed.excite_group, mixed.excite_hz, mixed.excite2_group, mixed.excite2_hz) == ("sugar", 100, "bitter", 200)
     assert by_key["sugar_100hz_shuffled"].connectivity == "shuffled"

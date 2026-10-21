@@ -7,7 +7,7 @@ from flybrain import processed
 from flybrain.paths import PROCESSED_DIR
 from flybrain.reference import load_reference_config
 from flybrain.validate import BOUNDARY, FAIL, INFO, ITEMS, PASS, Facts, KeyNeuron, Run, Check, Verdict, agreement, \
-    check_b2, check_b6, csr_summing_duplicates, engine_seed, mean_se
+    check_b2, check_b6, check_d2, csr_summing_duplicates, engine_seed, mean_se
 
 N_TRIALS = 30
 
@@ -97,12 +97,27 @@ def test_b2_counts_above_zero_without_stimulated():
             stimulated[condition] = np.arange(20)
         return Facts(runs, [], stimulated)
 
+    # Основной счёт — вместе с 20 стимулируемыми, как get_rate у Shiu (D-032); без них — для справки.
     verdict = check_b2(facts_for({10: 22, 50: 346, 100: 392, 200: 433}))
     assert verdict.state == PASS
-    assert verdict.values["counts"] == {10: 22, 50: 346, 100: 392, 200: 433}
-    assert verdict.values["with_stimulated"][10] == 42 and verdict.values["active"][200] == 0
-    assert check_b2(facts_for({10: 4, 50: 346, 100: 392, 200: 433})).state == FAIL  # 4 — не «десятки»
+    assert verdict.values["counts"] == {10: 42, 50: 366, 100: 412, 200: 453}
+    assert verdict.values["without_stimulated"][10] == 22 and verdict.values["active"][200] == 0
+    assert check_b2(facts_for({10: 22, 50: 30, 100: 40, 200: 50})).state == FAIL  # 200 Гц: 70 — не «сотни»
     assert check_b2(facts_for({10: 22, 50: 400, 100: 392, 200: 433})).state == FAIL  # не растёт
+    # Без стимулируемых при 10 Гц было бы 4 (не «десятки»), но основной счёт — 24: пункт выполнен.
+    assert check_b2(facts_for({10: 4, 50: 346, 100: 392, 200: 433})).state == PASS
+
+
+def test_d2_uses_paper_mn9():
+    keys = [KeyNeuron("MN9", "left", 0, "1", False), KeyNeuron("MN9", "right", 1, "720575940660219265", True)]
+
+    def facts_for(left: int, right: int) -> Facts:
+        key_counts = np.stack([np.full(N_TRIALS, left), np.full(N_TRIALS, right)], axis=1)
+        return Facts({"water_200hz": _run(key_counts.sum(axis=0), key_counts)}, keys,
+                     {"water_200hz": np.zeros(0, dtype=np.int64)})
+
+    assert check_d2(facts_for(0, 5)).state == PASS
+    assert check_d2(facts_for(5, 0)).state == FAIL  # активен только левый, а правило — про MN9 из статьи
 
 
 def test_engine_seeds_distinct():

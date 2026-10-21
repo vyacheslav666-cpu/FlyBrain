@@ -70,5 +70,13 @@ conditions:
     excite2: {group: water, hz: 40}
     honesty_ru: *added_after_reference
 
+  # [ЧЕСТНОСТЬ] Добавлено после того, как увидели эталон (D-032): вода 100 Гц (Б4) не включает MN9.
+  # У Shiu MN9 от всей группы воды измеряют на 160–220 Гц (figures.ipynb, рис. 4c, ячейки 40–42).
+  - key: water_200hz
+    name_ru: вода 200 Гц
+    excite: {group: water, hz: 200}
+    honesty_ru: >-
+      добавлено после того, как увидели эталон (D-032): у Shiu MN9 от воды измеряют на 160–220 Гц (рис. 4c)
+
 # Нейроны для итоговой таблицы (группы readouts из groups.json; столбцы — по сторонам мухи, D-011).
 summary_readouts: [MN9, aDN1, aDN2, aBN1, GF]
