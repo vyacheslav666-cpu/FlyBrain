@@ -11,6 +11,7 @@ import { createCard, createSearch, createTooltip, getInfo, getLinks, plural, RAT
 import { connectLive } from "./live.js";
 import { createLinks, createRings } from "./markers.js";
 import { createPicker } from "./picking.js";
+import { createPanelResizers } from "./resize.js";
 import { createSilhouette } from "./silhouette.js";
 import { createSkeletonView, getSkeleton } from "./skeleton.js";
 import { createStimulusPanel } from "./stimuli.js";
@@ -567,6 +568,7 @@ function start({ meta, stimuli, executors, positions, classes }) {
   }, meta.skeletons);
 
   createPanelsToggle();
+  createPanelResizers();
 
   /** Подпись на снимке: что включено и какое время модели — чтобы картинка сама себя объясняла. */
   function snapshotCaption() {
