@@ -1,0 +1,96 @@
+// Компас в углу (C12): три оси мухи — «перед», «лево», «верх» — поворачиваются вместе с мозгом,
+// чтобы после вращения было видно, откуда смотришь. Рисуется на обычном 2D-холсте поверх панели
+// (а не в 3D-сцене): так на него не действует размытие панели и он попадает в снимок экрана.
+import * as THREE from "three";
+
+// Оси данных (D-025): x — к левой стороне мухи, y — вниз, z — назад.
+const AXES = [
+  { label: "перед", direction: new THREE.Vector3(0, 0, -1), color: "#5ff0ff" },
+  { label: "лево", direction: new THREE.Vector3(1, 0, 0), color: "#ffc247" },
+  { label: "верх", direction: new THREE.Vector3(0, -1, 0), color: "#c4a8ff" },
+];
+const FONT = '12px "Segoe UI", system-ui, sans-serif';
+const RADIUS = 24; // длина оси, px
+const TAIL = 0.35; // «хвост» оси за центром — доля длины
+const LABEL_GAP = 5;
+
+/** `canvas` — холст нужного размера в CSS-пикселях (width/height в разметке), `camera` — камера сцены. */
+export function createCompass(canvas, camera) {
+  const cssWidth = canvas.width;
+  const cssHeight = canvas.height;
+  const ratio = Math.min(window.devicePixelRatio || 1, 2);
+  canvas.style.width = `${cssWidth}px`;
+  canvas.style.height = `${cssHeight}px`;
+  canvas.width = Math.round(cssWidth * ratio);
+  canvas.height = Math.round(cssHeight * ratio);
+  const context = canvas.getContext("2d");
+  const lastQuaternion = new THREE.Quaternion(NaN, NaN, NaN, NaN);
+  const inverse = new THREE.Quaternion();
+  const vector = new THREE.Vector3();
+
+  function draw() {
+    context.setTransform(ratio, 0, 0, ratio, 0, 0);
+    context.clearRect(0, 0, cssWidth, cssHeight);
+    context.font = FONT;
+    context.textBaseline = "middle";
+    context.lineCap = "round";
+    const cx = cssWidth / 2;
+    const cy = cssHeight / 2;
+    inverse.copy(camera.quaternion).invert();
+    // Рисуем от дальней оси к ближней: ближняя перекрывает.
+    const axes = AXES.map((axis) => {
+      vector.copy(axis.direction).applyQuaternion(inverse); // в осях камеры: x — вправо, y — вверх, z — к зрителю
+      return { ...axis, x: vector.x, y: -vector.y, z: vector.z };
+    }).sort((a, b) => a.z - b.z);
+
+    context.strokeStyle = "rgba(255,255,255,0.18)";
+    context.beginPath();
+    context.arc(cx, cy, 2, 0, Math.PI * 2);
+    context.stroke();
+
+    for (const axis of axes) {
+      const near = (axis.z + 1) / 2; // 0 — ось уходит от зрителя, 1 — смотрит на зрителя
+      context.globalAlpha = 0.4 + 0.6 * near;
+      context.strokeStyle = axis.color;
+      context.fillStyle = axis.color;
+      context.lineWidth = 1.5 + near;
+      const tipX = cx + axis.x * RADIUS;
+      const tipY = cy + axis.y * RADIUS;
+      context.beginPath();
+      context.moveTo(cx - axis.x * RADIUS * TAIL, cy - axis.y * RADIUS * TAIL);
+      context.lineTo(tipX, tipY);
+      context.stroke();
+      context.beginPath();
+      context.arc(tipX, tipY, 2.2 + 1.4 * near, 0, Math.PI * 2);
+      context.fill();
+
+      // Подпись — за кончиком оси; если ось смотрит почти на зрителя, подпись уходит вверх-вправо.
+      const length = Math.hypot(axis.x, axis.y);
+      const dx = length > 0.15 ? axis.x / length : 0.7;
+      const dy = length > 0.15 ? axis.y / length : -0.7;
+      const width = context.measureText(axis.label).width;
+      let labelX = tipX + dx * (LABEL_GAP + 3) + (dx >= 0 ? 0 : -width);
+      let labelY = tipY + dy * (LABEL_GAP + 3);
+      labelX = Math.min(Math.max(labelX, 1), cssWidth - width - 1);
+      labelY = Math.min(Math.max(labelY, 7), cssHeight - 7);
+      context.fillText(axis.label, labelX, labelY);
+    }
+    context.globalAlpha = 1;
+  }
+
+  draw();
+  return {
+    /** Перерисовать, если камера повернулась. */
+    update() {
+      if (lastQuaternion.equals(camera.quaternion)) return;
+      lastQuaternion.copy(camera.quaternion);
+      draw();
+    },
+    /** Нарисовать компас на готовом снимке: `x`, `y` — левый верхний угол, `scale` — снимок/CSS-пиксели. */
+    paintOn(target, x, y, scale) {
+      target.drawImage(canvas, x, y, cssWidth * scale, cssHeight * scale);
+    },
+    cssWidth,
+    cssHeight,
+  };
+}

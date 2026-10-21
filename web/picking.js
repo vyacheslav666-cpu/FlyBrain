@@ -8,7 +8,11 @@ const HALF = (PATCH - 1) / 2;
 const PICK_MIN_PX = 4; // зона попадания чуть больше видимой точки
 const PICK_MAX_PX = 14;
 
-export function createPicker(geometry, offset) {
+/**
+ * `glowUniforms` — часы и «шлейф» свечения (glow.uniforms): в режиме «только активные» (C12) выбрать можно
+ * только светящиеся нейроны, как и видно на экране.
+ */
+export function createPicker(geometry, offset, glowUniforms) {
   const scene = new THREE.Scene();
   const material = new THREE.ShaderMaterial({
     uniforms: {
@@ -16,14 +20,19 @@ export function createPicker(geometry, offset) {
       uMinPx: { value: PICK_MIN_PX },
       uMaxPx: { value: PICK_MAX_PX },
       uViewportHeight: { value: 1 },
+      uOnlyActive: { value: 0 },
+      uNow: glowUniforms.uNow,
+      uTau: glowUniforms.uTau,
     },
     vertexShader: /* glsl */ `
       attribute float aClass;
       attribute float aId;
-      uniform float uSizeUm, uMinPx, uMaxPx, uViewportHeight;
+      attribute vec2 aGlow;
+      uniform float uSizeUm, uMinPx, uMaxPx, uViewportHeight, uOnlyActive, uNow, uTau;
       varying float vId;
       void main() {
-        if (aClass > ${NO_POSITION - 0.5}) {   // нейрон без координат: выбрать нельзя
+        bool dark = uOnlyActive > 0.5 && aGlow.x * exp(-(uNow - aGlow.y) / uTau) < 0.04;   // как в glow.js: не светится
+        if (aClass > ${NO_POSITION - 0.5} || dark) {   // нейрон без координат или не светится в режиме «только активные»
           gl_Position = vec4(2.0, 2.0, 2.0, 1.0);
           gl_PointSize = 0.0;
           vId = 0.0;
@@ -63,6 +72,10 @@ export function createPicker(geometry, offset) {
   const savedColor = new THREE.Color();
 
   return {
+    setOnlyActive(flag) {
+      material.uniforms.uOnlyActive.value = flag ? 1 : 0;
+    },
+
     // Кадр для выбора рисуется в обычных пикселях экрана (без поправки на плотность экрана): так он дешевле.
     resize(width, height) {
       target.setSize(width, height);

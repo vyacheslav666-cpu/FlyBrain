@@ -3,6 +3,7 @@
   --panel: rgba(12, 16, 26, 0.72);
   --text: #e6ebf5;
   --muted: #8a94a8;
+  --bottom-gap: 72px; /* от нижнего края до верха подсказки внизу; main.js уточняет по её настоящей высоте */
 }
 
 * { box-sizing: border-box; }
@@ -35,18 +36,14 @@ html, body {
 #title h1 { margin: 0; font-size: 22px; font-weight: 600; letter-spacing: 0.04em; }
 #title p { margin: 4px 0 0; color: var(--muted); font-size: 13px; }
 
+/* Легенда классов стоит внутри панели «Вид» (C12), в левом нижнем углу. */
 #legend {
-  position: fixed;
-  left: 20px;
-  bottom: 72px;
-  max-width: 340px;
-  padding: 12px 14px;
-  background: var(--panel);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: 10px;
-  backdrop-filter: blur(6px);
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
   font-size: 13px;
 }
+#legend ul { max-height: 22vh; overflow-y: auto; color-scheme: dark; } /* список прокручивается: иначе он вытеснил бы панель стимулов */
 #legend h2 { margin: 0 0 8px; font-size: 13px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: 0.06em; }
 #legend ul { list-style: none; margin: 0; padding: 0; }
 #legend li { display: flex; align-items: baseline; gap: 8px; padding: 2px 0; }
@@ -151,7 +148,7 @@ html, body {
   top: 70px;
   right: 380px; /* левее панели «исполнителей» (340 px + 20 px от края + зазор) */
   width: 340px;
-  max-height: calc(100vh - 154px); /* сверху 70 px, снизу подсказка (72 px от края) и зазор */
+  max-height: calc(100vh - 70px - var(--bottom-gap) - 12px); /* сверху 70 px, снизу подсказка и зазор */
   overflow-y: auto;
   padding: 12px 14px;
   border-color: rgba(95, 240, 255, 0.5);
@@ -196,7 +193,7 @@ span.partner-label { color: var(--muted); }
 #live {
   position: fixed;
   right: 20px;
-  bottom: 72px;
+  bottom: var(--bottom-gap);
   width: 300px;
   padding: 12px 14px;
   background: var(--panel);
@@ -255,8 +252,8 @@ span.partner-label { color: var(--muted); }
   left: 20px;
   top: 70px;
   width: 340px;
-  /* снизу — подсказка (72 px от края) и легенда */
-  max-height: calc(100vh - 70px - 72px - var(--legend-height, 0px) - 12px);
+  /* снизу — подсказка (72 px от края) и панель «Вид» */
+  max-height: calc(100vh - 70px - var(--bottom-gap) - var(--view-height, 0px) - 12px);
   overflow-y: auto;
   padding: 12px 14px;
   background: var(--panel);
@@ -321,7 +318,7 @@ span.partner-label { color: var(--muted); }
   top: 70px;
   width: 340px;
   /* снизу — подсказка (72 px от края) и панель живого мозга */
-  max-height: calc(100vh - 70px - 72px - var(--live-height, 0px) - 12px);
+  max-height: calc(100vh - 70px - var(--bottom-gap) - var(--live-height, 0px) - 12px);
   overflow-y: auto;
   padding: 12px 14px;
   background: var(--panel);
@@ -389,3 +386,111 @@ span.partner-label { color: var(--muted); }
 .exec-more { width: 100%; margin-top: 6px; padding: 5px 8px; background: rgba(255, 255, 255, 0.06); border: 1px solid rgba(255, 255, 255, 0.16); border-radius: 8px; font-size: 12px; }
 .exec-more[hidden] { display: none; }
 .exec-more:hover { background: rgba(255, 255, 255, 0.12); }
+
+/* ---------- панель «Вид», компас, снимок, счётчик кадров (C12, D-036) ---------- */
+#view {
+  position: fixed;
+  left: 20px;
+  bottom: var(--bottom-gap);
+  width: 340px;
+  padding: 12px 14px;
+  background: var(--panel);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 10px;
+  backdrop-filter: blur(6px);
+  font-size: 13px;
+  line-height: 1.4;
+}
+#view h2 { margin: 0 0 8px; font-size: 13px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: 0.06em; }
+.view-top { display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; }
+.view-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 6px; }
+.view-main h2 { margin-bottom: 2px; }
+.view-row { display: flex; gap: 6px; }
+.view-row button { flex: 1; }
+#view button {
+  padding: 5px 8px;
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--text);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 8px;
+  font: inherit;
+  font-size: 12.5px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+#view button:hover { background: rgba(255, 255, 255, 0.12); }
+#view button[aria-pressed="true"] { background: rgba(95, 240, 255, 0.18); border-color: #5ff0ff; }
+#view .view-wide { width: 100%; }
+#compass { flex: none; margin-top: 2px; }
+.view-slider { display: grid; grid-template-columns: 62px 1fr 44px; align-items: center; gap: 8px; margin-top: 8px; color: var(--muted); font-size: 12px; }
+.view-slider input { width: 100%; margin: 0; accent-color: #5ff0ff; }
+.view-slider output { color: var(--text); text-align: right; font-variant-numeric: tabular-nums; }
+
+#active-hint, #toast {
+  position: fixed;
+  left: 50%;
+  transform: translateX(-50%);
+  max-width: min(480px, calc(100vw - 40px));
+  margin: 0;
+  padding: 6px 12px;
+  background: rgba(12, 16, 26, 0.88);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 10px;
+  font-size: 12.5px;
+  text-align: center;
+  pointer-events: none;
+}
+#active-hint { bottom: calc(var(--bottom-gap) + 24px); color: var(--muted); }
+#toast { bottom: calc(var(--bottom-gap) + 68px); border-color: rgba(95, 240, 255, 0.5); }
+#active-hint[hidden], #toast[hidden], #fps[hidden] { display: none; }
+
+#fps {
+  position: fixed;
+  top: 14px;
+  right: 20px;
+  padding: 4px 10px;
+  background: rgba(12, 16, 26, 0.88);
+  border-radius: 8px;
+  color: #7ee787;
+  font: 12px Consolas, monospace;
+  pointer-events: none;
+}
+#fps.slow { color: #ff8b8b; }
+
+/* Кнопка «Скрыть панели» (H): на узком окне панели не оставляют места облаку, поэтому там они сначала скрыты.
+   Компас остаётся в углу: он нужен именно тогда, когда смотришь на мозг без панелей. */
+#panels-toggle {
+  position: fixed;
+  top: 14px;
+  right: 20px;
+  padding: 6px 12px;
+  background: var(--panel);
+  color: var(--text);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 20px;
+  backdrop-filter: blur(6px);
+  font: inherit;
+  font-size: 12.5px;
+  cursor: pointer;
+}
+#panels-toggle:hover { background: rgba(255, 255, 255, 0.14); }
+#fps { top: 52px; }
+body.panels-hidden #stimuli,
+body.panels-hidden #executors,
+body.panels-hidden #live,
+body.panels-hidden #view .view-main,
+body.panels-hidden #view .view-slider,
+body.panels-hidden #legend { display: none; }
+body.panels-hidden #view { padding: 0; background: none; border: 0; backdrop-filter: none; width: auto; }
+@media (max-width: 760px) {
+  #search { width: min(420px, calc(100vw - 290px)); } /* между названием слева и кнопкой «Скрыть панели» справа */
+  #stimuli, #executors, #view { width: calc(50vw - 30px); }
+  #legend-note { display: none; }
+  .view-row button { padding: 5px 4px; font-size: 12px; }
+}
+@media (max-width: 520px) {
+  /* Панель уже 210 px: компас не помещается справа от кнопок и стоит над ними */
+  .view-top { flex-direction: column-reverse; align-items: stretch; }
+  #compass { align-self: flex-end; margin: 0 0 -4px; }
+  .view-slider { grid-template-columns: 56px 1fr 40px; gap: 6px; }
+}

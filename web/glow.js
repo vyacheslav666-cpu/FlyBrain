@@ -6,9 +6,9 @@ import { FullScreenQuad } from "/web/vendor/jsm/postprocessing/Pass.js";
 import { UnrealBloomPass } from "/web/vendor/jsm/postprocessing/UnrealBloomPass.js";
 import { MAX_CLASSES, NO_POSITION, POINT_SIZE_UM } from "./constants.js";
 
-const GLOW_TAU_S = 0.3; // за это время (по часам показа) вспышка гаснет в e ≈ 2,7 раза
+export const GLOW_TAU_S = 0.3; // за это время (по часам показа) вспышка гаснет в e ≈ 2,7 раза («шлейф», C12 — ползунок)
 const MAX_HEAT = 4; // частые спайки накапливают «жар», но не больше этого
-const QUIET_AFTER_S = GLOW_TAU_S * 12; // после стольких секунд без спайков свечение не рисуем вовсе
+const QUIET_AFTER_TAUS = 12; // после стольких «шлейфов» без спайков свечение не рисуем вовсе
 const BLOOM = { strength: 0.75, radius: 0.35, threshold: 0.15 };
 const BLOOM_DOWNSCALE = 2;
 
@@ -25,6 +25,7 @@ export function createGlow(geometry, palette, offset, count) {
       uPalette: { value: palette },
       uNow: { value: 0 },
       uTau: { value: GLOW_TAU_S },
+      uGain: { value: 1 },
       uSizeUm: { value: POINT_SIZE_UM * 1.25 },
       uMinPx: { value: 3 },
       uMaxPx: { value: 14 },
@@ -34,7 +35,7 @@ export function createGlow(geometry, palette, offset, count) {
       attribute float aClass;
       attribute vec2 aGlow;
       uniform vec3 uPalette[${MAX_CLASSES}];
-      uniform float uNow, uTau, uSizeUm, uMinPx, uMaxPx, uViewportHeight;
+      uniform float uNow, uTau, uGain, uSizeUm, uMinPx, uMaxPx, uViewportHeight;
       varying vec3 vColor;
       void main() {
         float heat = aGlow.x * exp(-(uNow - aGlow.y) / uTau);
@@ -45,7 +46,7 @@ export function createGlow(geometry, palette, offset, count) {
           return;
         }
         float level = 1.0 - exp(-heat);                       // 0…1: одиночный спайк ≈ 0,63, частые — ближе к 1
-        vColor = mix(uPalette[int(aClass + 0.5)], vec3(1.0, 0.96, 0.88), 0.45) * (0.25 + 0.8 * level);
+        vColor = mix(uPalette[int(aClass + 0.5)], vec3(1.0, 0.96, 0.88), 0.45) * (0.25 + 0.8 * level) * uGain;
         vec4 viewPosition = modelViewMatrix * vec4(position, 1.0);
         gl_Position = projectionMatrix * viewPosition;
         float pixels = uSizeUm * projectionMatrix[1][1] * uViewportHeight * 0.5 / -viewPosition.z;
@@ -90,11 +91,32 @@ export function createGlow(geometry, palette, offset, count) {
   }));
 
   let now = 0; // часы показа, с: идут, только пока симуляция не на паузе
+  let tau = GLOW_TAU_S;
   let lastSpikeAt = -Infinity;
   const blackColor = new THREE.Color(0, 0, 0);
   const savedColor = new THREE.Color();
 
   return {
+    /** Общие с выбором мышью числа: по ним картинка выбора тоже знает, какие нейроны сейчас светятся. */
+    uniforms: { uNow: material.uniforms.uNow, uTau: material.uniforms.uTau },
+
+    /** Яркость свечения (1 — как было в C9): сама точка и ореол вокруг неё. */
+    setBrightness(value) {
+      material.uniforms.uGain.value = value;
+      bloom.strength = BLOOM.strength * value;
+    },
+
+    /** «Шлейф»: за сколько секунд показа вспышка гаснет в e ≈ 2,7 раза. */
+    setTrail(seconds) {
+      tau = seconds;
+      material.uniforms.uTau.value = seconds;
+    },
+
+    /** Ничего не светится (давно не было спайков). */
+    isQuiet() {
+      return now - lastSpikeAt > tau * QUIET_AFTER_TAUS;
+    },
+
     /** Продвинуть часы показа (вызывается каждый кадр экрана, пока симуляция идёт). */
     advance(seconds) {
       now += seconds;
@@ -105,7 +127,7 @@ export function createGlow(geometry, palette, offset, count) {
     spike(neurons, spikes) {
       for (let k = 0; k < neurons.length; k++) {
         const at = neurons[k] * 2;
-        const heat = glow[at] * Math.exp(-(now - glow[at + 1]) / GLOW_TAU_S);
+        const heat = glow[at] * Math.exp(-(now - glow[at + 1]) / tau);
         glow[at] = Math.min(MAX_HEAT, heat + spikes[k]);
         glow[at + 1] = now;
       }
@@ -135,7 +157,7 @@ export function createGlow(geometry, palette, offset, count) {
 
     /** Нарисовать свечение поверх уже нарисованного кадра. */
     render(renderer, camera) {
-      if (now - lastSpikeAt > QUIET_AFTER_S) return; // ничего не светится — не тратим видеокарту
+      if (this.isQuiet()) return; // ничего не светится — не тратим видеокарту
       const previousTarget = renderer.getRenderTarget();
       const previousAlpha = renderer.getClearAlpha();
       const previousAutoClear = renderer.autoClear;

@@ -71,17 +71,49 @@
   <aside id="card" hidden></aside>
   <div id="tooltip" hidden></div>
 
-  <aside id="legend" hidden>
-    <h2><button id="legend-toggle" type="button" aria-expanded="true" title="свернуть или развернуть">Классы нейронов <span class="chevron" aria-hidden="true">▾</span></button></h2>
-    <ul id="legend-list"></ul>
-    <p id="legend-note"></p>
-  </aside>
+  <section id="view" hidden>
+    <div class="view-top">
+      <div class="view-main">
+        <h2>Вид</h2>
+        <div class="view-row" role="group" aria-label="ракурс камеры">
+          <button type="button" data-view="front" aria-pressed="false" title="Смотрим мухе в лицо">Спереди</button>
+          <button type="button" data-view="top" aria-pressed="false" title="Смотрим на мозг сверху, перед мухи — вверх на экране">Сверху</button>
+          <button type="button" data-view="side" aria-pressed="false" title="Смотрим на левый бок мухи, перед — слева на экране">Сбоку</button>
+        </div>
+        <button type="button" id="view-active" class="view-wide" aria-pressed="false"
+                title="Прячет тусклое облако: видны только нейроны, которые выстрелили за время «шлейфа». Выбирать мышью тоже можно только их">Только активные</button>
+        <div class="view-row">
+          <button type="button" id="view-shell" aria-pressed="true" title="Полупрозрачный контур мозга. Это оформление, а не анатомия: поверхность проведена по плотности точек нейронов">Контур</button>
+          <button type="button" id="view-shot" title="Сохраняет картинку (PNG) в папку «Загрузки»">📷 Снимок</button>
+        </div>
+      </div>
+      <canvas id="compass" width="112" height="92" role="img"
+              aria-label="компас: куда в мозге перед, лево и верх мухи"
+              title="Оси мухи: перед, лево (левая сторона мухи), верх. Поворачиваются вместе с мозгом."></canvas>
+    </div>
+    <label class="view-slider" title="Яркость облака, контура и свечения. Меняется только показ, модель не меняется"><span>Яркость</span>
+      <input id="view-brightness" type="range" min="0" max="100" step="1" value="50">
+      <output id="view-brightness-text">1,0×</output></label>
+    <label class="view-slider" title="Как долго вспышка остаётся видна после спайка. Меняется только показ, модель не меняется"><span>Шлейф</span>
+      <input id="view-trail" type="range" min="0" max="100" step="1" value="45">
+      <output id="view-trail-text">0,3 с</output></label>
+    <aside id="legend" hidden>
+      <h2><button id="legend-toggle" type="button" aria-expanded="true" title="свернуть или развернуть">Классы нейронов <span class="chevron" aria-hidden="true">▾</span></button></h2>
+      <ul id="legend-list"></ul>
+      <p id="legend-note"></p>
+    </aside>
+  </section>
+
+  <p id="active-hint" hidden>Режим «только активные»: сейчас ни один нейрон не светится. Включите стимул слева.</p>
+  <p id="toast" role="status" hidden></p>
+  <div id="fps" hidden></div>
+  <button id="panels-toggle" type="button" hidden aria-pressed="false" title="Клавиша H">Скрыть панели</button>
 
   <footer id="help">
     <p>Левая кнопка мыши — вращать, колесо — приблизить, правая кнопка — сдвинуть.
     Наведите на точку — появится подсказка; щелчок закрепляет нейрон и показывает его связи.
     Светятся нейроны, которые только что выстрелили в модели.
-    Вид спереди: муха смотрит на вас, её левая сторона — справа на экране.</p>
+    Вид спереди: муха смотрит на вас, её левая сторона — справа на экране. Клавиша H — скрыть панели, F — частота кадров.</p>
     <p class="credits">Данные: коннектом мозга взрослой дрозофилы FlyWire (Dorkenwald et al. 2024;
     Schlegel et al. 2024), лицензия CC&nbsp;BY&nbsp;4.0.</p>
   </footer>
