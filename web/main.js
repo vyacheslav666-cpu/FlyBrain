@@ -6,6 +6,7 @@ import { createAbout } from "./about.js";
 import { HEADER_BYTES, MAX_CLASSES, NO_POSITION, POINT_SIZE_UM } from "./constants.js";
 import { createCompass } from "./compass.js";
 import { createFpsMeter } from "./fps.js";
+import { fitDistance, freeArea } from "./framing.js";
 import { createGlow } from "./glow.js";
 import { createExecutorPanel } from "./executors.js";
 import { createCard, createSearch, createTooltip, getInfo, getLinks, plural, RATE_HINT } from "./inspector.js";
@@ -477,18 +478,29 @@ function start({ meta, stimuli, executors, positions, classes }) {
     autoRotateWanted = false;
   }
 
+  // Панели, под которыми не должны оказаться найденные нейроны (D-040).
+  const framingPanels = ["stimuli", "view", "executors", "live", "card"].map((id) => document.getElementById(id));
+  const searchBox = document.getElementById("search");
+  const helpBox = document.getElementById("help");
+
   function flyToNeurons(indices) {
     const sum = [0, 0, 0];
     for (const index of indices) pointOf(index).forEach((value, axis) => { sum[axis] += value; });
     const centre = sum.map((value) => value / indices.length);
-    let spread = 0;
-    for (const index of indices) {
-      const [x, y, z] = pointOf(index);
-      spread = Math.max(spread, Math.hypot(x - centre[0], y - centre[1], z - centre[2]));
-    }
+    // Камера смотрит с той же стороны, что и сейчас, и отходит настолько, чтобы все найденные нейроны
+    // поместились в середину экрана между панелями.
+    const rects = framingPanels.filter((panel) => panel.getClientRects().length > 0)
+      .map((panel) => panel.getBoundingClientRect());
+    const area = freeArea(rects, window.innerWidth, window.innerHeight,
+      searchBox.getBoundingClientRect().bottom, helpBox.getBoundingClientRect().top);
+    const axes = { right: new THREE.Vector3(1, 0, 0), up: new THREE.Vector3(0, 1, 0), back: new THREE.Vector3(0, 0, 1) };
+    for (const axis of Object.values(axes)) axis.applyQuaternion(camera.quaternion);
+    const basis = Object.fromEntries(Object.entries(axes).map(([name, axis]) => [name, axis.toArray()]));
+    const tanHalfFov = Math.tan(THREE.MathUtils.degToRad(camera.fov / 2));
+    const distance = fitDistance(indices.map(pointOf), centre, basis, tanHalfFov, camera.aspect, area);
     startFlight({
       target: new THREE.Vector3(...centre).add(offset),
-      distance: Math.min(Math.max(spread * 2.6, 70), controls.maxDistance),
+      distance: Math.min(Math.max(distance, 70), controls.maxDistance),
     });
   }
 

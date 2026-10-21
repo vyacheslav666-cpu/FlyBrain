@@ -51,3 +51,11 @@ def test_every_element_the_scripts_look_up_exists_on_the_page():
             if name not in ids:
                 missing.append(f"{script.name}: {name}")
     assert not missing, f"в index.html нет элементов: {missing}"
+
+
+@needs_node
+def test_found_neurons_fit_between_panels():
+    # После поиска камера отходит так, чтобы найденные нейроны не оказались под боковыми панелями (D-040).
+    check = PROJECT_ROOT / "tests" / "js" / "framing_check.mjs"
+    result = subprocess.run(["node", str(check)], capture_output=True, text=True, encoding="utf-8", timeout=60)
+    assert result.returncode == 0, result.stdout + result.stderr
