@@ -1,5 +1,6 @@
-"""`flybrain serve`: сервер страницы и данных нейронов (FastAPI, коммит C7, D-015)."""
+"""`flybrain serve`: сервер страницы и данных нейронов (FastAPI, коммит C7, D-015) и «живой» мозг (C9)."""
 
+import asyncio
 import json
 import mimetypes
 import sys
@@ -9,11 +10,12 @@ import urllib.request
 import webbrowser
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI, HTTPException, Query
+from fastapi import FastAPI, HTTPException, Query, WebSocket, WebSocketDisconnect
 from fastapi.responses import FileResponse, JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
 
-from flybrain import processed, webdata
+from flybrain import live, processed, webdata
+from flybrain.engine import Engine
 from flybrain.lookup import NeuronLookup
 from flybrain.paths import PROCESSED_DIR, PROJECT_ROOT
 from flybrain.serverctl import stop_old_server
@@ -30,6 +32,9 @@ CODE_VERSION = code_version()
 mimetypes.add_type("text/javascript", ".js")
 
 
+LIVE_QUEUE_FRAMES = 100  # ~4 с кадров: если страница не успевает их забирать, лишние выбрасываются
+
+
 def create_app(processed_dir=PROCESSED_DIR, web_dir=WEB_DIR) -> FastAPI:
     state: dict = {}
 
@@ -38,10 +43,18 @@ def create_app(processed_dir=PROCESSED_DIR, web_dir=WEB_DIR) -> FastAPI:
         neurons = processed.load_neurons(processed_dir)
         legend = webdata.load_legend()
         names = webdata.load_yaml(webdata.NAMES_FILE)
+        connectivity = processed.load_connectivity(processed_dir)
         state["cloud"] = webdata.build_cloud_gzip(neurons, legend)
         state["meta"] = webdata.build_meta(neurons, legend, names)
-        state["lookup"] = NeuronLookup(neurons, processed.load_connectivity(processed_dir), names, legend)
+        state["lookup"] = NeuronLookup(neurons, connectivity, names, legend)
+        # Живой мозг (C9): один повтор на видеокарте. Движок строится, только когда откроется первая страница.
+        sugar = processed.load_groups(processed_dir)["stimuli"]["sugar"]
+        state["live"] = live.LiveSim(
+            lambda: Engine(connectivity["indptr"], connectivity["indices"], connectivity["weight"], n_trials=1),
+            sugar["indices"], test_label=sugar["name_ru"], test_about=sugar["about_ru"])
+        state["live"].start()
         yield
+        state["live"].stop()
 
     app = FastAPI(title="FlyBrain", lifespan=lifespan)
 
@@ -83,6 +96,46 @@ def create_app(processed_dir=PROCESSED_DIR, web_dir=WEB_DIR) -> FastAPI:
     @app.get("/api/search")
     def search(q: str = Query(max_length=100)) -> JSONResponse:
         return JSONResponse(state["lookup"].search(q), headers={"Cache-Control": "no-cache"})
+
+    @app.websocket("/ws/live")
+    async def live_stream(socket: WebSocket) -> None:
+        """Поток живого мозга: сервер шлёт кадры (двоичные) и состояние (JSON), страница — команды (JSON)."""
+        await socket.accept()
+        loop = asyncio.get_running_loop()
+        outbox: asyncio.Queue = asyncio.Queue(maxsize=LIVE_QUEUE_FRAMES)
+
+        def put(item) -> None:  # выполняется в цикле сервера
+            if outbox.full() and isinstance(item, bytes):
+                return  # страница не успевает: кадр пропадает (состояние не выбрасываем)
+            if outbox.full():
+                outbox.get_nowait()
+            outbox.put_nowait(item)
+
+        def send(item) -> None:  # вызывается из потока расчёта
+            loop.call_soon_threadsafe(put, item)
+
+        async def pump() -> None:
+            while True:
+                item = await outbox.get()
+                if isinstance(item, bytes):
+                    await socket.send_bytes(item)
+                else:
+                    await socket.send_text(item)
+
+        sim = state["live"]
+        sim.subscribe(send)
+        sender = asyncio.create_task(pump())
+        try:
+            while True:
+                message = await socket.receive_json()
+                if isinstance(message, dict):
+                    sim.command(message)
+        except (WebSocketDisconnect, ValueError):
+            pass
+        finally:
+            sim.unsubscribe(send)
+            sender.cancel()
+            await asyncio.gather(sender, return_exceptions=True)
 
     app.mount("/web", StaticFiles(directory=web_dir), name="web")
     return app

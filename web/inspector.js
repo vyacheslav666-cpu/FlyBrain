@@ -1,4 +1,5 @@
 // Подсказка, карточка закреплённого нейрона и строка поиска (коммит C8). Данные берутся у сервера: /api/neuron, /api/search.
+// Строку «Частота сейчас» заполняет main.js по потоку живого мозга (C9).
 
 const infoCache = new Map();
 const linksCache = new Map();
@@ -37,7 +38,9 @@ export function plural(count, one, few, many) {
 
 const formatInt = (number) => number.toLocaleString("ru-RU");
 
-/** Строки одного нейрона: имя, класс, сторона, медиатор, знак в модели, номер FlyWire. */
+export const RATE_HINT = "спайки этого нейрона за последнюю 1 с модельного времени (живой режим)";
+
+/** Строки одного нейрона: имя, класс, сторона, медиатор, знак в модели, номер FlyWire, текущая частота. */
 function describe(info) {
   const box = document.createDocumentFragment();
   const head = element("div", "neuron-head");
@@ -55,6 +58,8 @@ function describe(info) {
   add("Медиатор (по таблице)", info.transmitter_name);
   add("Знак в модели", info.sign_name, info.sign > 0 ? "sign-plus" : info.sign < 0 ? "sign-minus" : "");
   add("Номер FlyWire", info.flywire_id, "mono");
+  add("Частота сейчас", "—", "live-rate");
+  rows.lastElementChild.previousElementSibling.title = RATE_HINT;
   box.append(rows);
   return box;
 }

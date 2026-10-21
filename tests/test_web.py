@@ -69,7 +69,9 @@ def test_legend_file_covers_all_classes_of_names_file():
 def test_vendor_files_match_recorded_checksums():
     # Чужие файлы three.js не должны меняться незаметно (web/vendor/README.md).
     readme = (PROJECT_ROOT / "web" / "vendor" / "README.md").read_text(encoding="utf-8")
-    for name in ("three.module.js", "OrbitControls.js", "LICENSE-three.txt"):
+    for name in ("three.module.js", "OrbitControls.js", "LICENSE-three.txt",
+                 "jsm/postprocessing/UnrealBloomPass.js", "jsm/postprocessing/Pass.js",
+                 "jsm/shaders/CopyShader.js", "jsm/shaders/LuminosityHighPassShader.js"):
         digest = hashlib.sha256((PROJECT_ROOT / "web" / "vendor" / name).read_bytes()).hexdigest()
         assert digest in readme, f"контрольная сумма {name} не совпала с записью в README"
 

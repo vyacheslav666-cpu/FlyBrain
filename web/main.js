@@ -1,8 +1,11 @@
-// 3D-облако нейронов мухи (C7) с подсказкой, закреплением нейрона и поиском (C8). Симуляции здесь пока нет.
+// 3D-облако нейронов мухи (C7) с подсказкой, закреплением нейрона и поиском (C8) и «живым» мозгом (C9):
+// сервер считает модель и шлёт, кто выстрелил; выстрелившие нейроны вспыхивают и гаснут.
 import * as THREE from "three";
 import { OrbitControls } from "/web/vendor/OrbitControls.js";
 import { HEADER_BYTES, MAX_CLASSES, NO_POSITION, POINT_SIZE_UM } from "./constants.js";
-import { createCard, createSearch, createTooltip, getInfo, getLinks } from "./inspector.js";
+import { createGlow } from "./glow.js";
+import { createCard, createSearch, createTooltip, getInfo, getLinks, RATE_HINT } from "./inspector.js";
+import { connectLive } from "./live.js";
 import { createLinks, createRings } from "./markers.js";
 import { createPicker } from "./picking.js";
 
@@ -21,6 +24,10 @@ function showError(message) {
 
 function formatInt(number) {
   return number.toLocaleString("ru-RU");
+}
+
+function formatNumber(number, digits) {
+  return number.toLocaleString("ru-RU", { minimumFractionDigits: digits, maximumFractionDigits: digits });
 }
 
 async function loadData() {
@@ -100,7 +107,7 @@ function buildPoints(meta, positions, classes) {
   points.frustumCulled = false;
   const offset = new THREE.Vector3(-cx, -cy, -cz); // мозг в начале координат: камера вращается вокруг его середины
   points.position.copy(offset);
-  return { points, material, geometry, offset };
+  return { points, material, geometry, offset, palette };
 }
 
 function buildLegend(meta) {
@@ -131,6 +138,71 @@ function buildLegend(meta) {
 const COLOR = { hover: 0xffffff, pinned: 0x5ff0ff, search: 0xffc247, input: 0x4fc3ff, output: 0xff9a3d };
 const CLICK_MAX_MOVE_PX = 5; // сдвиг мыши больше этого — это вращение, а не щелчок
 const FLIGHT_MS = 900;
+const LIVE_TEXT_EVERY_MS = 250; // как часто обновлять цифры живого режима (скорость, частоты)
+
+/** Панель «Живой мозг»: кнопки, скорость (D-017), плашка «в покое мозг молчит» (D-019). */
+function createLivePanel(onCommand) {
+  const $ = (id) => document.getElementById(id);
+  const pause = $("live-pause");
+  const reset = $("live-reset");
+  const test = $("live-test");
+  let status = null;
+  let connected = false;
+
+  pause.addEventListener("click", () => onCommand({ cmd: status?.paused ? "resume" : "pause" }));
+  reset.addEventListener("click", () => onCommand({ cmd: "reset" }));
+  test.addEventListener("click", () => onCommand({ cmd: "test", on: !status?.test }));
+
+  function stateText() {
+    if (!connected) return "Нет связи с сервером: подключаюсь снова…";
+    if (!status) return "Подключаюсь к серверу…";
+    switch (status.state) {
+      case "starting": return "Готовлю движок модели (несколько секунд)…";
+      case "error": return `Ошибка: ${status.message}`;
+      case "paused": return "Пауза: модель стоит, свечение замерло.";
+      case "running": return `Считает ${status.device}.`;
+      default: return "Жду…";
+    }
+  }
+
+  function refresh() {
+    const ready = connected && status && (status.state === "running" || status.state === "paused");
+    pause.disabled = reset.disabled = test.disabled = !ready;
+    pause.textContent = status?.paused ? "▶ Продолжить" : "⏸ Пауза";
+    test.setAttribute("aria-pressed", String(Boolean(status?.test)));
+    if (status) {
+      test.textContent = `Тест: ${status.test_label.toLowerCase()} ${formatInt(status.test_hz)} Гц` +
+        (status.test ? " — выключить" : "");
+      $("live-test-note").textContent =
+        `Временная кнопка: ${status.test_count} нейронов — ${status.test_about}. ` +
+        "Прямое включение нейронов случайными импульсами, как в статье, а не настоящий сахар.";
+    }
+    $("live-quiet").hidden = Boolean(status?.test);
+    $("live-state").textContent = stateText();
+    const running = ready && status.state === "running";
+    const speed = status?.speed ?? 0;
+    $("live-speed").textContent = running && speed > 0 ? `${formatNumber(speed, 2)}× реального времени` : "—";
+    $("live-speed-note").textContent = running && speed > 0
+      ? (status.max_speed && speed > 0.98 * status.max_speed
+        ? "Видеокарта успевает быстрее, но модель нарочно идёт не быстрее реального времени."
+        : `1 с жизни мухи считается ${formatNumber(1 / speed, 1)} с; шаги по 0,1 мс не пропускаем.`)
+      : "";
+    $("live-time").textContent = status ? `${formatNumber(status.time_ms / 1000, 2)} с` : "—";
+  }
+
+  const root = document.getElementById("live");
+  root.hidden = false;
+  // Карточка нейрона стоит над панелью и не должна на неё наезжать.
+  new ResizeObserver(() => {
+    document.documentElement.style.setProperty("--live-height", `${root.offsetHeight}px`);
+  }).observe(root);
+  return {
+    setStatus(next) { status = next; refresh(); },
+    setConnected(value) { connected = value; refresh(); },
+    refresh,
+    get running() { return connected && status?.state === "running"; },
+  };
+}
 
 function start({ meta, positions, classes }) {
   const canvas = document.getElementById("scene");
@@ -145,9 +217,10 @@ function start({ meta, positions, classes }) {
   const distance = meta.radius * 3.1;
   camera.position.set(distance * 0.28, -distance * 0.22, -distance * 0.93);
 
-  const { points, material, geometry, offset } = buildPoints(meta, positions, classes);
+  const { points, material, geometry, offset, palette } = buildPoints(meta, positions, classes);
   scene.add(points);
   const picker = createPicker(geometry, offset);
+  const glow = createGlow(geometry, palette, offset, classes.length);
 
   // Кольца и линии лежат в тех же координатах, что и облако.
   const hoverRing = createRings({ color: COLOR.hover, sizePx: 22, alpha: 0.9 });
@@ -350,13 +423,50 @@ function start({ meta, positions, classes }) {
     material.uniforms.uMinPx.value = MIN_POINT_PX * pixelRatio;
     material.uniforms.uMaxPx.value = MAX_POINT_PX * pixelRatio;
     picker.resize(window.innerWidth, window.innerHeight);
+    // Свечение — в обычных пикселях экрана, без поправки на плотность: оно и так размытое, а на встроенной
+    // видеокарте ноутбука это в 3 раза дешевле (замер C9: 3,4 мс против 11 мс на кадр).
+    glow.resize(window.innerWidth, window.innerHeight, Math.min(pixelRatio, 1));
     for (const layer of rings) layer.setPixelRatio(pixelRatio);
     pickDirty = true;
   }
   window.addEventListener("resize", resize);
   resize();
 
+  // ---------- живой мозг ----------
+  const panel = createLivePanel((command) => live.send(command));
+  const live = connectLive({
+    count: classes.length,
+    onFrame: (neurons, spikes) => glow.spike(neurons, spikes),
+    onStatus: (status) => panel.setStatus(status),
+    onReset: () => glow.clear(),
+    onConnection: (connected) => panel.setConnected(connected),
+  });
+
+  function rateText(index) {
+    const rate = index >= 0 ? live.rateOf(index) : null;
+    if (!rate) return "— (модель ещё не считала)";
+    const span = rate.spanMs < 995 ? ` (за ${formatNumber(rate.spanMs / 1000, 2)} с)` : "";
+    return `${formatNumber(rate.hz, 1)} Гц${span}`;
+  }
+
+  function refreshLiveText() {
+    panel.refresh();
+    const tooltipRate = tooltipElement.querySelector(".live-rate");
+    if (tooltipRate && !tooltipElement.hidden) tooltipRate.textContent = rateText(hovered);
+    const cardRate = document.querySelector("#card .live-rate");
+    if (cardRate) {
+      cardRate.textContent = rateText(pinned);
+      cardRate.title = RATE_HINT;
+    }
+  }
+  setInterval(refreshLiveText, LIVE_TEXT_EVERY_MS);
+
+  let lastFrameAt = performance.now();
   renderer.setAnimationLoop(() => {
+    const frameAt = performance.now();
+    // Свечение гаснет по часам показа, которые стоят на паузе: вспышки замирают вместе с моделью.
+    if (panel.running) glow.advance(Math.min((frameAt - lastFrameAt) / 1000, 0.1));
+    lastFrameAt = frameAt;
     stepFlight();
     controls.autoRotate = autoRotateWanted && hovered < 0 && pinned < 0 && !searchActive;
     controls.update();
@@ -365,12 +475,13 @@ function start({ meta, positions, classes }) {
       setHovered(picker.pick(renderer, camera, mouse.x, mouse.y));
     }
     renderer.render(scene, camera);
+    glow.render(renderer, camera);
   });
 
   buildLegend(meta);
   statusEl.textContent = `Показано нейронов: ${formatInt(meta.shown)} из ${formatInt(meta.total)}`;
   document.getElementById("search").hidden = false;
-  window.flybrain = { camera, controls, renderer, scene, picker, pin, unpin }; // для отладки в консоли браузера
+  window.flybrain = { camera, controls, renderer, scene, picker, pin, unpin, live, glow }; // для отладки в консоли браузера
 }
 
 loadData().then(start).catch((error) => showError(`Ошибка: ${error.message}`));

@@ -25,6 +25,24 @@
     <p id="search-status"></p>
   </div>
 
+  <section id="live" hidden>
+    <h2>Живой мозг</h2>
+    <div class="live-buttons">
+      <button id="live-pause" type="button" disabled>⏸ Пауза</button>
+      <button id="live-reset" type="button" disabled title="все нейроны — в покой, время модели — с нуля; включённый тест остаётся">↺ Сброс</button>
+    </div>
+    <button id="live-test" type="button" class="live-test" aria-pressed="false" disabled>Тест: сахар 100 Гц</button>
+    <p id="live-test-note" class="live-note"></p>
+    <dl class="live-rows">
+      <dt>Скорость</dt><dd id="live-speed">—</dd>
+      <dt>Время модели</dt><dd id="live-time">—</dd>
+    </dl>
+    <p id="live-speed-note" class="live-note"></p>
+    <p id="live-state" class="live-note">Подключаюсь к серверу…</p>
+    <p id="live-quiet" class="live-quiet">В покое мозг молчит — это свойство модели: в модели Shiu нет
+    спонтанной активности. Живой мозг мухи в покое не молчит.</p>
+  </section>
+
   <aside id="card" hidden></aside>
   <div id="tooltip" hidden></div>
 
@@ -37,6 +55,7 @@
   <footer id="help">
     <p>Левая кнопка мыши — вращать, колесо — приблизить, правая кнопка — сдвинуть.
     Наведите на точку — появится подсказка; щелчок закрепляет нейрон и показывает его связи.
+    Светятся нейроны, которые только что выстрелили в модели.
     Вид спереди: муха смотрит на вас, её левая сторона — справа на экране.</p>
     <p class="credits">Данные: коннектом мозга взрослой дрозофилы FlyWire (Dorkenwald et al. 2024;
     Schlegel et al. 2024), лицензия CC&nbsp;BY&nbsp;4.0.</p>
