@@ -14,8 +14,9 @@ from fastapi import FastAPI, HTTPException, Query, WebSocket, WebSocketDisconnec
 from fastapi.responses import FileResponse, JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
 
-from flybrain import live, processed, stimuli, webdata
+from flybrain import executors, live, processed, stimuli, webdata
 from flybrain.engine import Engine
+from flybrain.groups import load_group_config
 from flybrain.lookup import NeuronLookup
 from flybrain.paths import PROCESSED_DIR, PROJECT_ROOT
 from flybrain.serverctl import stop_old_server
@@ -44,6 +45,12 @@ class NoCacheStaticFiles(StaticFiles):
 LIVE_QUEUE_FRAMES = 100  # ~4 с кадров: если страница не успевает их забирать, лишние выбрасываются
 
 
+def _paper_root_ids(group_config: dict) -> dict[str, set[str]]:
+    """Номера нейронов, записанные у Shiu и найденные в версии 783, для каждой группы раздела readouts."""
+    return {key: {str(entry["id"]) for entry in group.get("paper_ids") or [] if entry["status"] == "in_783"}
+            for key, group in group_config["readouts"].items()}
+
+
 def create_app(processed_dir=PROCESSED_DIR, web_dir=WEB_DIR) -> FastAPI:
     state: dict = {}
 
@@ -57,8 +64,13 @@ def create_app(processed_dir=PROCESSED_DIR, web_dir=WEB_DIR) -> FastAPI:
         state["meta"] = webdata.build_meta(neurons, legend, names)
         state["lookup"] = NeuronLookup(neurons, connectivity, names, legend)
         # Кнопки-стимулы (C10) и живой мозг (C9): один повтор на видеокарте. Движок строится, только когда откроется первая страница.
-        state["stimuli"], stimulus_indices = stimuli.build_catalog(processed.load_groups(processed_dir),
-                                                                   stimuli.load_buttons())
+        groups = processed.load_groups(processed_dir)
+        buttons = stimuli.load_buttons()
+        state["stimuli"], stimulus_indices = stimuli.build_catalog(groups, buttons)
+        # Панель «исполнителей» (C11): моторные и нисходящие нейроны и ожидания по статье.
+        state["executors"] = executors.build_panel(
+            groups, neurons, state["lookup"].label, _paper_root_ids(load_group_config()), executors.load_config(),
+            {button["key"] for button in buttons}, names["sides"])
         state["live"] = live.LiveSim(
             lambda: Engine(connectivity["indptr"], connectivity["indices"], connectivity["weight"], n_trials=1),
             stimulus_indices)
@@ -88,6 +100,10 @@ def create_app(processed_dir=PROCESSED_DIR, web_dir=WEB_DIR) -> FastAPI:
             media_type="application/octet-stream",
             headers={"Content-Encoding": "gzip", "Cache-Control": "no-cache"},
         )
+
+    @app.get("/api/executors")
+    def executor_panel() -> JSONResponse:
+        return JSONResponse(state["executors"], headers={"Cache-Control": "no-cache"})
 
     @app.get("/api/stimuli")
     def stimulus_panel() -> JSONResponse:

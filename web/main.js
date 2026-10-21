@@ -4,6 +4,7 @@ import * as THREE from "three";
 import { OrbitControls } from "/web/vendor/OrbitControls.js";
 import { HEADER_BYTES, MAX_CLASSES, NO_POSITION, POINT_SIZE_UM } from "./constants.js";
 import { createGlow } from "./glow.js";
+import { createExecutorPanel } from "./executors.js";
 import { createCard, createSearch, createTooltip, getInfo, getLinks, RATE_HINT } from "./inspector.js";
 import { connectLive } from "./live.js";
 import { createLinks, createRings } from "./markers.js";
@@ -33,17 +34,21 @@ function formatNumber(number, digits) {
 }
 
 async function loadData() {
-  const [metaResponse, cloudResponse, stimuliResponse] =
-    await Promise.all([fetch("/api/meta"), fetch("/api/cloud.bin"), fetch("/api/stimuli")]);
-  if (!metaResponse.ok || !cloudResponse.ok || !stimuliResponse.ok) throw new Error("сервер не отдал данные нейронов");
+  const [metaResponse, cloudResponse, stimuliResponse, executorsResponse] =
+    await Promise.all([fetch("/api/meta"), fetch("/api/cloud.bin"), fetch("/api/stimuli"), fetch("/api/executors")]);
+  if (!metaResponse.ok || !cloudResponse.ok || !stimuliResponse.ok || !executorsResponse.ok) {
+    throw new Error("сервер не отдал данные нейронов");
+  }
   const meta = await metaResponse.json();
   const stimuli = await stimuliResponse.json();
+  const executors = await executorsResponse.json();
   const buffer = await cloudResponse.arrayBuffer();
   const [count, version] = new Uint32Array(buffer, 0, 2);
   if (version !== meta.format || count !== meta.total) throw new Error("данные нейронов не подходят к странице");
   return {
     meta,
     stimuli,
+    executors,
     positions: new Float32Array(buffer, HEADER_BYTES, count * 3),
     classes: new Uint8Array(buffer, HEADER_BYTES + count * 12, count),
   };
@@ -156,6 +161,7 @@ const COLOR = { hover: 0xffffff, pinned: 0x5ff0ff, search: 0xffc247, input: 0x4f
 const CLICK_MAX_MOVE_PX = 5; // сдвиг мыши больше этого — это вращение, а не щелчок
 const FLIGHT_MS = 900;
 const LIVE_TEXT_EVERY_MS = 250; // как часто обновлять цифры живого режима (скорость, частоты)
+const EXECUTORS_EVERY_MS = 100; // панель «исполнителей» обновляется чаще: полоски должны быстро падать
 
 const SLIDER_OFF = 100; // последнее деление ползунка замедления — «максимум», без замедления
 const SLIDER_STEPS = SLIDER_OFF - 1; // деления 0…99 — от самой медленной цели до slow_slider_max, по логарифму
@@ -261,7 +267,7 @@ function createLivePanel(onCommand, anyStimulus) {
   };
 }
 
-function start({ meta, stimuli, positions, classes }) {
+function start({ meta, stimuli, executors, positions, classes }) {
   const canvas = document.getElementById("scene");
   const renderer = new THREE.WebGLRenderer({ canvas, antialias: false, alpha: false });
   renderer.setClearColor(0x05070d, 1);
@@ -335,6 +341,7 @@ function start({ meta, stimuli, positions, classes }) {
   // ---------- закрепление ----------
   async function pin(index) {
     pinned = index;
+    executorPanel?.setPinned(index);
     hoverRing.set([]);
     tooltip.hide();
     pinnedRing.set(pointOf(index));
@@ -378,6 +385,7 @@ function start({ meta, stimuli, positions, classes }) {
 
   function unpin() {
     pinned = -1;
+    executorPanel?.setPinned(-1);
     pinnedRing.set([]);
     inputRings.set([]);
     outputRings.set([]);
@@ -492,12 +500,14 @@ function start({ meta, stimuli, positions, classes }) {
   // ---------- живой мозг ----------
   const stimulusPanel = createStimulusPanel(stimuli, (command) => live.send(command));
   const panel = createLivePanel((command) => live.send(command), () => stimulusPanel.anyOn);
+  let executorPanel = null; // создаётся ниже, когда есть `live`
   const live = connectLive({
     count: classes.length,
     onFrame: (neurons, spikes) => glow.spike(neurons, spikes),
     onStatus: (status) => {
       stimulusPanel.setStatus(status);
       panel.setStatus(status);
+      executorPanel?.setStatus(status);
     },
     onReset: () => glow.clear(),
     onConnection: (connected) => {
@@ -505,6 +515,12 @@ function start({ meta, stimuli, positions, classes }) {
       panel.setConnected(connected);
     },
   });
+
+  // Панель «исполнителей» (C11): щелчок по нейрону — камера подлетает, нейрон закрепляется (кольцо и карточка).
+  executorPanel = createExecutorPanel(
+    executors, Object.fromEntries(stimuli.buttons.map((button) => [button.key, button.name_ru])), live,
+    (index) => { flyToNeurons([index]); pin(index); });
+  setInterval(() => { if (!document.hidden) executorPanel.update(); }, EXECUTORS_EVERY_MS);
 
   function rateText(index) {
     const rate = index >= 0 ? live.rateOf(index) : null;

@@ -13,6 +13,7 @@ const RECONNECT_MS = 2000;
 export function connectLive({ count, onFrame, onStatus, onReset, onConnection }) {
   const windowCounts = new Uint16Array(count); // спайки каждого нейрона в окне частоты
   const frames = []; // кадры внутри окна: {start, end, neurons, spikes}
+  const scratch = new Uint16Array(count); // рабочий массив для ratesOf: после каждого вызова снова нулевой
   let windowStart = 0; // начало окна, мс модели
   let latestEnd = 0;
   let epoch = null;
@@ -89,6 +90,25 @@ export function connectLive({ count, onFrame, onStatus, onReset, onConnection })
   return {
     send(command) {
       if (socket && socket.readyState === WebSocket.OPEN) socket.send(JSON.stringify(command));
+    },
+    /**
+     * Спайки выбранных нейронов за последние `windowMs` мс модели (панель «исполнителей», C11):
+     * `{ counts: Uint16Array, spanMs }`. Окно набирается целыми кадрами, поэтому `spanMs` — сколько мс модели
+     * реально вошло в счёт (чуть больше `windowMs`, если кадр пересёк границу); частота = counts · 1000 / spanMs.
+     * Меньше `windowMs` оно бывает только сразу после запуска или сброса: тогда `spanMs` показывает, сколько набралось.
+     */
+    countsIn(indices, windowMs) {
+      const counts = new Uint16Array(indices.length);
+      if (frames.length === 0) return { counts, spanMs: 0 };
+      let first = frames.length - 1;
+      while (first > 0 && frames[first - 1].end > latestEnd - windowMs) first--;
+      const add = (frame, sign) => {
+        for (let k = 0; k < frame.neurons.length; k++) scratch[frame.neurons[k]] += sign * frame.spikes[k];
+      };
+      for (let f = first; f < frames.length; f++) add(frames[f], 1);
+      for (let k = 0; k < indices.length; k++) counts[k] = scratch[indices[k]];
+      for (let f = first; f < frames.length; f++) add(frames[f], -1);
+      return { counts, spanMs: latestEnd - frames[first].start };
     },
     /** Текущая частота нейрона, Гц, за последнюю 1 с модели (или меньше, если модель считает меньше секунды). */
     rateOf(index) {

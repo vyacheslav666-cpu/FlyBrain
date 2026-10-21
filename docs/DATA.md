@@ -192,6 +192,8 @@ FlyWire Codex (codex.flywire.ai) требует входа через Google и 
 
 Описание кнопок-стимулов (какие группы на какой стороне, тексты «ⓘ») — `GET /api/stimuli`; собирается из `config/stimulus_panel.yaml` и `groups.json`.
 
+Панель «исполнителей» (C11, D-035) — `GET /api/executors`: список из 1409 моторных и нисходящих нейронов (номер, имя, класс, сторона, тип FlyWire) и ожидания по статье для каждого стимула; собирается из `config/executors.yaml`, `groups.json` и `config/names_ru.yaml`.
+
 ## 6. Эталонные прогоны (`data/reference/`)
 
 Собирает команда `flybrain reference` (коммит C4, D-029): неизменённый `model.py` Shiu на Brian2, условия — в `config/reference.yaml`. Папка в git не попадает (D-009); пересобрать её можно той же командой, повторы получатся теми же самыми (зерно случайных чисел записано).
