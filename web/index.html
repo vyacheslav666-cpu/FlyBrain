@@ -80,22 +80,21 @@
         <button type="button" id="view-active" class="view-wide" aria-pressed="false"
                 title="Прячет тусклое облако: видны только нейроны, которые выстрелили за время «шлейфа». Выбирать мышью тоже можно только их">Только активные</button>
         <button type="button" id="view-shapes" class="view-wide" aria-pressed="false">Формы нейронов</button>
-        <div class="view-row">
-          <button type="button" id="view-shell" aria-pressed="true" title="Полупрозрачный контур мозга. Это оформление, а не анатомия: поверхность проведена по плотности точек нейронов">Контур</button>
-          <button type="button" id="view-shot" title="Сохраняет картинку (PNG) в папку «Загрузки»">📷 Снимок</button>
-        </div>
+        <button type="button" id="view-shell" class="view-wide" aria-pressed="true" title="Полупрозрачный контур мозга. Это оформление, а не анатомия: поверхность проведена по плотности точек нейронов">Контур</button>
       </div>
     </div>
-    <label class="view-slider" title="Яркость облака, контура и свечения. Меняется только показ, модель не меняется"><span>Яркость</span>
-      <input id="view-brightness" type="range" min="0" max="100" step="1" value="50">
-      <output id="view-brightness-text">1,0×</output></label>
+    <label class="view-slider" title="Яркость вспышек: нейроны, которые только что выстрелили, и ореол вокруг них. Меняется только показ, модель не меняется"><span>Активные</span>
+      <input id="view-bright-active" type="range" min="0" max="100" step="1" value="50">
+      <output id="view-bright-active-text">1,0×</output></label>
+    <label class="view-slider" title="Яркость тусклого облака молчащих нейронов, контура мозга и формы выбранного нейрона. Меняется только показ, модель не меняется"><span>Неактивные</span>
+      <input id="view-bright-idle" type="range" min="0" max="100" step="1" value="50">
+      <output id="view-bright-idle-text">1,0×</output></label>
     <label class="view-slider" title="Как долго вспышка остаётся видна после спайка. Меняется только показ, модель не меняется"><span>Шлейф</span>
       <input id="view-trail" type="range" min="0" max="100" step="1" value="45">
       <output id="view-trail-text">0,3 с</output></label>
     <aside id="legend" hidden>
       <h2><button id="legend-toggle" type="button" aria-expanded="true" title="свернуть или развернуть">Классы нейронов <span class="chevron" aria-hidden="true">▾</span></button></h2>
       <ul id="legend-list"></ul>
-      <p id="legend-note"></p>
     </aside>
   </section>
 

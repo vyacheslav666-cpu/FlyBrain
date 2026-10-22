@@ -49,7 +49,6 @@ html, body {
 #legend li { display: flex; align-items: baseline; gap: 8px; padding: 2px 0; }
 #legend .swatch { flex: none; width: 10px; height: 10px; border-radius: 50%; transform: translateY(1px); }
 #legend .count { margin-left: auto; padding-left: 10px; color: var(--muted); font-variant-numeric: tabular-nums; white-space: nowrap; }
-#legend-note { margin: 8px 0 0; color: var(--muted); font-size: 12px; line-height: 1.4; }
 
 #help {
   position: fixed;
@@ -267,7 +266,7 @@ span.partner-label { color: var(--muted); }
 }
 #legend h2 button:hover { color: var(--text); }
 #legend.collapsed h2 { margin-bottom: 0; }
-#legend.collapsed ul, #legend.collapsed #legend-note { display: none; }
+#legend.collapsed ul { display: none; }
 #legend.collapsed .chevron { transform: rotate(-90deg); }
 
 #stimuli {
@@ -407,7 +406,7 @@ span.partner-label { color: var(--muted); }
 .exec-more[hidden] { display: none; }
 .exec-more:hover { background: rgba(255, 255, 255, 0.12); }
 
-/* ---------- панель «Вид», компас, снимок, счётчик кадров (C12, D-036) ---------- */
+/* ---------- панель «Вид», компас, счётчик кадров (C12, D-036) ---------- */
 #view {
   position: fixed;
   left: 20px;
@@ -425,8 +424,6 @@ span.partner-label { color: var(--muted); }
 .view-top { display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; }
 .view-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 6px; }
 .view-main h2 { margin-bottom: 2px; }
-.view-row { display: flex; gap: 6px; }
-.view-row button { flex: 1; }
 #view button {
   padding: 5px 8px;
   background: rgba(255, 255, 255, 0.06);
@@ -444,7 +441,7 @@ span.partner-label { color: var(--muted); }
 #view button[aria-disabled="true"] { opacity: 0.45; cursor: help; }
 /* Компас — внизу посередине, над подсказкой (D-044). Подсказка «только активные» и сообщения стоят над ним. */
 #compass { position: fixed; left: 50%; bottom: calc(var(--bottom-gap) + 2px); z-index: 1; transform: translateX(-50%); }
-.view-slider { display: grid; grid-template-columns: 62px 1fr 44px; align-items: center; gap: 8px; margin-top: 8px; color: var(--muted); font-size: 12px; }
+.view-slider { display: grid; grid-template-columns: 78px 1fr 44px; align-items: center; gap: 8px; margin-top: 8px; color: var(--muted); font-size: 12px; }
 .view-slider input { width: 100%; margin: 0; accent-color: #5ff0ff; }
 .view-slider output { color: var(--text); text-align: right; font-variant-numeric: tabular-nums; }
 
@@ -580,11 +577,9 @@ body.panels-hidden #view { display: none; }
 @media (max-width: 760px) {
   #search { width: min(420px, calc(100vw - 290px)); } /* между названием слева и кнопкой «Скрыть панели» справа */
   #stimuli, #executors, #view { width: calc(50vw - 30px); }
-  #legend-note { display: none; }
-  .view-row button { padding: 5px 4px; font-size: 12px; }
 }
 @media (max-width: 520px) {
-  .view-slider { grid-template-columns: 56px 1fr 40px; gap: 6px; }
+  .view-slider { grid-template-columns: 74px 1fr 40px; gap: 6px; }
 }
 
 /* ---------- окно «О проекте» (C13, D-039) ---------- */

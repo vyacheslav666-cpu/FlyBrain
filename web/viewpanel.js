@@ -1,4 +1,5 @@
-// Панель «Вид» (C12): ракурсы, «только активные», формы нейронов (C12b), контур мозга, снимок, яркость и шлейф.
+// Панель «Вид» (C12): вид по умолчанию, «только активные», формы нейронов (C12b), контур мозга,
+// яркость активных и неактивных нейронов (D-048) и шлейф.
 // Настройки запоминаются в браузере (localStorage); если он недоступен — страница работает без запоминания.
 
 const STORAGE_KEY = "flybrain.view";
@@ -33,20 +34,23 @@ const SHAPES_MISSING = "Формы нейронов не скачаны. Это 
   "«uv run flybrain fetch-skeletons» в PowerShell в папке проекта, затем перезапустите run.bat";
 
 /**
- * `handlers`: onView(name), onActiveOnly(bool), onShell(bool), onShapes(bool), onShot(), onBrightness(value),
+ * `handlers`: onView(name), onActiveOnly(bool), onShell(bool), onShapes(bool), onActiveBrightness(value), onIdleBrightness(value),
  * onTrail(seconds), onShapesMissing(text). `shapes` — {available, reason} из /api/meta (D-037).
  * Сохранённые значения применяются сразу, через те же обработчики.
  */
 export function createViewPanel(handlers, shapes) {
   const $ = (id) => document.getElementById(id);
   const prefs = {
-    activeOnly: false, shell: true, shapes: true, brightness: BRIGHTNESS.start, trail: TRAIL.start, ...loadPrefs(),
+    activeOnly: false, shell: true, shapes: true, trail: TRAIL.start, ...loadPrefs(),
   };
+  // До D-048 яркость была одна — она становится начальной для обеих.
+  prefs.brightActive ??= prefs.brightness ?? BRIGHTNESS.start;
+  prefs.brightIdle ??= prefs.brightness ?? BRIGHTNESS.start;
+  delete prefs.brightness;
   const viewButtons = [...document.querySelectorAll("#view [data-view]")];
   const activeButton = $("view-active");
   const shellButton = $("view-shell");
   const shapesButton = $("view-shapes");
-  const brightness = $("view-brightness");
   const trail = $("view-trail");
 
   function remember(patch) {
@@ -84,34 +88,39 @@ export function createViewPanel(handlers, shapes) {
     remember({ shapes: value });
     handlers.onShapes(value);
   });
-  $("view-shot").addEventListener("click", () => handlers.onShot());
 
-  function applyBrightness() {
-    const value = positionToValue(BRIGHTNESS, Number(brightness.value));
-    $("view-brightness-text").textContent = `${value.toLocaleString("ru-RU", { maximumFractionDigits: 1, minimumFractionDigits: 1 })}×`;
-    handlers.onBrightness(value);
+  /** Ползунок яркости: `id` — его поле, `key` — имя в сохранённых настройках, `handler` — куда отдать значение. */
+  function brightnessSlider(id, key, handler) {
+    const input = $(id);
+    const apply = () => {
+      const value = positionToValue(BRIGHTNESS, Number(input.value));
+      $(`${id}-text`).textContent = `${value.toLocaleString("ru-RU", { maximumFractionDigits: 1, minimumFractionDigits: 1 })}×`;
+      handler(value);
+    };
+    input.addEventListener("input", () => {
+      remember({ [key]: Number(input.value) });
+      apply();
+    });
+    input.value = String(prefs[key]);
+    apply();
   }
   function applyTrail() {
     const value = positionToValue(TRAIL, Number(trail.value));
     $("view-trail-text").textContent = formatSeconds(value);
     handlers.onTrail(value);
   }
-  brightness.addEventListener("input", () => {
-    remember({ brightness: Number(brightness.value) });
-    applyBrightness();
-  });
   trail.addEventListener("input", () => {
     remember({ trail: Number(trail.value) });
     applyTrail();
   });
 
   // Сохранённое состояние — в разметку и в обработчики.
-  brightness.value = String(prefs.brightness);
   trail.value = String(prefs.trail);
   setToggle(activeButton, prefs.activeOnly);
   setToggle(shellButton, prefs.shell);
   setToggle(shapesButton, shapes.available && prefs.shapes);
-  applyBrightness();
+  brightnessSlider("view-bright-active", "brightActive", handlers.onActiveBrightness);
+  brightnessSlider("view-bright-idle", "brightIdle", handlers.onIdleBrightness);
   applyTrail();
   handlers.onActiveOnly(prefs.activeOnly);
   handlers.onShell(prefs.shell);

@@ -145,10 +145,6 @@ function buildLegend(meta) {
     item.append(swatch, name, count);
     list.append(item);
   }
-  const hiddenNote = meta.hidden > 0 ? ` У ${formatInt(meta.hidden)} нейронов в таблице нет координат, их не видно.` : "";
-  document.getElementById("legend-note").textContent =
-    `Точка — тело клетки (${formatInt(meta.soma)}) или, если тела нет в данных, ` +
-    `точка на отростке внутри мозга (${formatInt(meta.anchor)}).${hiddenNote}`;
   const legend = document.getElementById("legend");
   legend.hidden = false;
   // Легенду можно свернуть: слева над ней стоит панель стимулов, которой нужно место. На низких и узких экранах она свёрнута.
@@ -535,10 +531,8 @@ function start({ meta, stimuli, executors, positions, classes }) {
     return Object.keys(VIEWS).find((name) => toCamera.dot(VIEWS[name]) > VIEW_MATCH) ?? null;
   }
 
-  // ---------- вид: только активные, контур, яркость, снимок ----------
+  // ---------- вид: только активные, контур, яркость ----------
   let activeOnly = false;
-  let snapshotRequested = false;
-  let lastStatus = null;
   const hintElement = document.getElementById("active-hint");
   const toastElement = document.getElementById("toast");
   let toastTimer = null;
@@ -567,63 +561,18 @@ function start({ meta, stimuli, executors, positions, classes }) {
       if (pinned >= 0) showShape(pinned);
     },
     onShapesMissing: (text) => showToast(text),
-    onShot() { snapshotRequested = true; },
-    onBrightness(value) {
+    // Две яркости (D-048): «неактивные» — тусклое облако, контур мозга и форма нейрона; «активные» — вспышки и ореол.
+    onIdleBrightness(value) {
       material.uniforms.uAlpha.value = POINT_ALPHA * value;
       silhouette.setBrightness(value);
-      glow.setBrightness(value);
       shape.setBrightness(value);
     },
+    onActiveBrightness: (value) => glow.setBrightness(value),
     onTrail: (seconds) => glow.setTrail(seconds),
   }, meta.skeletons);
 
   createPanelsToggle();
   createPanelResizers();
-
-  /** Подпись на снимке: что включено и какое время модели — чтобы картинка сама себя объясняла. */
-  function snapshotCaption() {
-    const names = Object.fromEntries(stimuli.buttons.map((button) => [button.key, button.name_ru]));
-    const on = Object.entries(lastStatus?.stimuli ?? {}).filter(([, state]) => state.on);
-    const what = on.length > 0
-      ? on.map(([key, state]) => `${names[key] ?? key} (${state.side === "left" ? "левая" : "правая"}, ${state.hz} Гц)`).join(" + ")
-      : "стимулы выключены";
-    const time = lastStatus ? ` · время модели ${formatNumber(lastStatus.time_ms / 1000, 2)} с` : "";
-    return [`FlyBrain · ${what}${time}`, "Данные: FlyWire (CC BY 4.0) · модель: Shiu et al. 2024"];
-  }
-
-  /** Сохраняет картинку: кадр холста + компас + подпись. Вызывается сразу после отрисовки кадра. */
-  function takeSnapshot() {
-    const scale = canvas.width / canvas.clientWidth;
-    const picture = document.createElement("canvas");
-    picture.width = canvas.width;
-    picture.height = canvas.height;
-    const context = picture.getContext("2d");
-    context.drawImage(canvas, 0, 0);
-    const margin = 14 * scale;
-    compass.paintOn(context, margin, picture.height - margin - compass.cssHeight * scale, scale);
-    context.font = `${Math.round(12 * scale)}px "Segoe UI", system-ui, sans-serif`;
-    context.textAlign = "right";
-    context.textBaseline = "alphabetic";
-    context.fillStyle = "rgba(230,235,245,0.85)";
-    const lines = snapshotCaption();
-    lines.forEach((line, k) => {
-      context.fillText(line, picture.width - margin, picture.height - margin - (lines.length - 1 - k) * 16 * scale);
-    });
-    const stamp = new Date().toLocaleString("sv-SE").replace(" ", "_").replaceAll(":", "-");
-    const filename = `flybrain-${stamp}.png`;
-    picture.toBlob((blob) => {
-      if (!blob) {
-        showToast("Снимок не получился: браузер не отдал картинку.");
-        return;
-      }
-      const link = document.createElement("a");
-      link.href = URL.createObjectURL(blob);
-      link.download = filename;
-      link.click();
-      setTimeout(() => URL.revokeObjectURL(link.href), 10000);
-      showToast(`Снимок сохранён: ${filename} (папка «Загрузки»)`);
-    }, "image/png");
-  }
 
   createSearch({
     input: document.getElementById("search-input"),
@@ -708,7 +657,6 @@ function start({ meta, stimuli, executors, positions, classes }) {
     count: classes.length,
     onFrame: (neurons, spikes) => glow.spike(neurons, spikes),
     onStatus: (status) => {
-      lastStatus = status;
       stimulusPanel.setStatus(status);
       panel.setStatus(status);
       executorPanel?.setStatus(status);
@@ -764,10 +712,6 @@ function start({ meta, stimuli, executors, positions, classes }) {
     renderer.render(scene, camera);
     glow.render(renderer, camera);
     compass.update();
-    if (snapshotRequested) { // сразу после отрисовки: тогда в холсте лежит именно этот кадр
-      snapshotRequested = false;
-      takeSnapshot();
-    }
     const view = currentViewName();
     if (view !== shownView) {
       shownView = view;
