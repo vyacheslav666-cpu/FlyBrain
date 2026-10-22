@@ -1,5 +1,8 @@
 // Подсказка, карточка закреплённого нейрона и строка поиска (коммит C8). Данные берутся у сервера: /api/neuron, /api/search.
 // Строку «Частота сейчас» заполняет main.js по потоку живого мозга (C9).
+// Карточку можно двигать, сворачивать и менять её размер (floating.js, D-041).
+
+import { makeFloating } from "./floating.js";
 
 const infoCache = new Map();
 const linksCache = new Map();
@@ -106,13 +109,27 @@ export function createCard(root, { onClose, onSelect }) {
     return section;
   }
 
+  // Заголовок (за него карточку двигают), прокручиваемое содержимое и уголок для размера.
+  const bar = element("div", "card-bar");
+  bar.title = "Потяните, чтобы передвинуть карточку. Двойной щелчок — обычное место и размер";
+  const title = element("strong", "card-title");
+  const collapse = element("button", "card-button card-collapse");
+  const close = element("button", "card-button card-close", "×");
+  close.title = "снять выбор (Esc)";
+  close.addEventListener("click", onClose);
+  bar.append(title, collapse, close);
+  const body = element("div", "card-body");
+  const grip = element("div", "card-grip");
+  grip.title = "Потяните, чтобы изменить размер карточки";
+  root.replaceChildren(bar, body, grip);
+  const floating = makeFloating(root, { bar, grip, collapseButton: collapse });
+
   return {
     showInfo(info) {
-      const close = element("button", "card-close", "×");
-      close.title = "снять выбор (Esc)";
-      close.addEventListener("click", onClose);
-      root.replaceChildren(close, describe(info), element("p", "card-loading", "Загружаю связи…"));
+      title.textContent = info.label;
+      body.replaceChildren(describe(info), element("p", "card-loading", "Загружаю связи…"));
       root.hidden = false;
+      floating.fit();
       this.info = info;
     },
     showLinks(links) {
@@ -120,7 +137,7 @@ export function createCard(root, { onClose, onSelect }) {
       const hint = element("p", "card-hint",
         "На рисунке: синие линии — самые сильные входы (кто передаёт этому нейрону), " +
         "оранжевые — самые сильные выходы (кому он передаёт). Не больше 20 с каждой стороны.");
-      root.append(
+      body.append(
         hint,
         partnerList("Получает от", "partners-in", links.inputs, links.inputs_total),
         partnerList("Передаёт", "partners-out", links.outputs, links.outputs_total),
@@ -131,7 +148,7 @@ export function createCard(root, { onClose, onSelect }) {
     },
     showError(message) {
       root.querySelector(".card-loading")?.remove();
-      root.append(element("p", "card-hint", `Не получилось загрузить связи: ${message}`));
+      body.append(element("p", "card-hint", `Не получилось загрузить связи: ${message}`));
     },
     /** Строка о форме нейрона (C12b) под описанием; `text` пустой — строки нет. */
     showShape(text, title = "") {

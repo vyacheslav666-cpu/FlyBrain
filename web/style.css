@@ -161,10 +161,41 @@ html, body {
   right: 380px; /* левее панели «исполнителей» (340 px + 20 px от края + зазор) */
   width: 340px;
   max-height: calc(100vh - 70px - var(--bottom-gap) - 12px); /* сверху 70 px, снизу подсказка и зазор */
-  overflow-y: auto;
-  padding: 12px 14px;
+  z-index: 4; /* карточку можно унести на другую панель — она должна быть сверху */
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
   border-color: rgba(95, 240, 255, 0.5);
 }
+#card[hidden] { display: none; }
+/* Заголовок, за который карточку двигают, и уголок для размера (D-041). */
+.card-bar { display: flex; align-items: center; gap: 4px; padding: 8px 6px 4px 14px; cursor: move; user-select: none; touch-action: none; }
+.card-title { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 16px; }
+.card-body { flex: 1 1 auto; min-height: 0; overflow-y: auto; padding: 0 14px 12px; color-scheme: dark; }
+#card .neuron-head { padding-right: 0; }
+#card .neuron-label { display: none; } /* имя уже в заголовке */
+#card .neuron-head:not(:has(.neuron-about)) { display: none; }
+#card.collapsed { height: auto !important; }
+#card.collapsed .card-body, #card.collapsed .card-grip { display: none; }
+#card.collapsed .card-bar { padding-bottom: 8px; }
+.card-grip {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  width: 18px;
+  height: 18px;
+  cursor: nwse-resize;
+  touch-action: none;
+  background: linear-gradient(135deg, transparent 50%, rgba(255, 255, 255, 0.28) 50%, rgba(255, 255, 255, 0.28) 58%,
+    transparent 58%, transparent 70%, rgba(255, 255, 255, 0.28) 70%, rgba(255, 255, 255, 0.28) 78%, transparent 78%);
+  border-bottom-right-radius: 10px;
+}
+.card-grip:hover, body.card-sizing .card-grip {
+  background: linear-gradient(135deg, transparent 50%, #5ff0ff 50%, #5ff0ff 58%, transparent 58%, transparent 70%, #5ff0ff 70%,
+    #5ff0ff 78%, transparent 78%);
+}
+body.card-moving, body.card-moving * { cursor: move !important; user-select: none; }
+body.card-sizing, body.card-sizing * { cursor: nwse-resize !important; user-select: none; }
 .neuron-head { display: flex; flex-direction: column; gap: 2px; margin-bottom: 8px; padding-right: 18px; }
 .neuron-label { font-size: 16px; }
 .neuron-about { color: var(--muted); font-size: 12px; }
@@ -174,10 +205,8 @@ html, body {
 .neuron-rows .mono { font-family: Consolas, monospace; font-size: 12px; }
 .sign-plus { color: #7ee787; }
 .sign-minus { color: #ff8b8b; }
-.card-close {
-  position: absolute;
-  top: 6px;
-  right: 8px;
+.card-button {
+  flex: 0 0 auto;
   width: 24px;
   height: 24px;
   padding: 0;
@@ -187,7 +216,7 @@ html, body {
   font-size: 20px;
   cursor: pointer;
 }
-.card-close:hover { color: var(--text); }
+.card-button:hover { color: var(--text); }
 .card-loading, .card-hint { margin: 10px 0 0; color: var(--muted); font-size: 12px; }
 .card-shape { margin: 8px 0 0; padding-left: 8px; border-left: 2px solid #ffffff; color: var(--text); font-size: 12px; }
 .partners { margin-top: 10px; }
