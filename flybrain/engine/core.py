@@ -21,8 +21,16 @@ groups → thresholds → synapses → resets; проверено по исхо�
 записывается в CUDA Graph один раз и дальше только повторяется.
 
 Повторы — второй размер всех массивов: состояние (N, повторы), блок спайков (N, 18, повторы).
+
+Добавки эксперимента P1 (D-053…D-055), обе по умолчанию выключены — тогда расчёт идёт ровно прежними
+операциями, спайк в спайк как до P1:
+- `set_threshold_shift` — свой порог у каждого нейрона: v_th_i = v_th − сдвиг_i («доза» психоделика);
+- `set_noise` — шум мембраны: к шагу 1 добавляется σ·√(1 − A²)·ξ, ξ ~ N(0, 1). Тогда у нейрона без входов
+  и без порога v колеблется вокруг покоя со стандартным отклонением ровно σ (точное решение процесса
+  Орнштейна — Уленбека за шаг). Веса связей эти добавки не трогают.
 """
 
+import math
 import warnings
 
 import numpy as np
@@ -105,6 +113,9 @@ class Engine:
         self._stimuli: dict[str, tuple[np.ndarray, float]] = {}
         self._stim_index = torch.zeros(0, dtype=torch.int64, device=dev)
         self._stim_p = torch.zeros((0, 1), device=dev)
+        self._v_th: torch.Tensor | None = None  # порог каждого нейрона (N, 1); None — у всех v_th из params
+        self.noise_sigma = 0.0  # σ шума мембраны, мВ; 0 — шума нет
+        self._noise_scale = 0.0  # σ·√(1 − A²): добавка за шаг
         self._graph: torch.cuda.CUDAGraph | None = None
 
         self.spike_log: list[np.ndarray] = []  # при record_spikes: массивы (шаг, нейрон, повтор)
@@ -156,6 +167,43 @@ class Engine:
         """Выключение как `silence()` у Shiu: вес всех выходных связей нейрона = 0. Сам нейрон считается дальше."""
         index = torch.as_tensor(np.asarray(indices, dtype=np.int64).ravel(), device=self.device)
         self._live[index] = 0.0 if silenced else 1.0
+
+    def set_threshold_shift(self, shift_mv) -> None:
+        """Снизить порог каждого нейрона на `shift_mv` мВ (массив на N нейронов; P1, D-055).
+
+        `None` или все нули — порог у всех v_th из params, и расчёт идёт прежними операциями (спайк в спайк
+        как без этой добавки). Повторный вызов меняет сдвиг на ходу.
+        """
+        shift = None if shift_mv is None else np.asarray(shift_mv, dtype=np.float64).ravel()
+        if shift is not None:
+            if len(shift) != self.n_neurons:
+                raise EngineError(f"сдвиг порога: нужно {self.n_neurons} чисел, а не {len(shift)}")
+            if not np.isfinite(shift).all():
+                raise EngineError("сдвиг порога: есть нечисловые значения")
+            if not shift.any():
+                shift = None
+        if shift is None:
+            if self._v_th is not None:
+                self._v_th = None
+                self._graph = None  # снова прежние операции — блок записывается заново
+            return
+        v_th = torch.as_tensor(self.params.v_th - shift, dtype=self.dtype, device=self.device)[:, None]
+        if self._v_th is None:
+            self._v_th = v_th
+            self._graph = None
+        else:
+            self._v_th.copy_(v_th)  # те же ячейки памяти: записанный блок увидит новый порог
+
+    def set_noise(self, sigma_mv: float) -> None:
+        """Шум мембраны со стандартным отклонением `sigma_mv` мВ (P1, D-055); 0 — шума нет, как у Shiu."""
+        sigma = float(sigma_mv)
+        if not math.isfinite(sigma) or sigma < 0:
+            raise EngineError("σ шума должна быть числом не меньше 0")
+        if sigma == self.noise_sigma:
+            return
+        self.noise_sigma = sigma
+        self._noise_scale = sigma * math.sqrt(1.0 - self._a ** 2)
+        self._graph = None  # σ входит в записанный блок числом — блок записывается заново
 
     def _update_stimuli(self) -> None:
         parts = [(indices, hz) for indices, hz in self._stimuli.values()]
@@ -261,10 +309,13 @@ class Engine:
         # 1. groups: точное решение за шаг, кроме «отдыхающих».
         active = (now - self.last_spike) >= self._ref_steps
         v_new = (v - p.v_0) * self._a + g * self._b + p.v_0
+        if self._noise_scale:
+            v_new.add_(torch.randn(v.shape, generator=self._generator, device=self.device, dtype=self.dtype),
+                       alpha=self._noise_scale)
         torch.where(active, v_new, v, out=v)
         torch.where(active, g * self._e, g, out=g)
         # 2. thresholds.
-        spike = (v > p.v_th) & active
+        spike = (v > (p.v_th if self._v_th is None else self._v_th)) & active
         torch.where(spike, now, self.last_spike, out=self.last_spike)
         self._spiked[:, j, :] = spike
         self._outbox[:, j, :] = spike * self._live

@@ -1,5 +1,6 @@
 """Движок C5 на крошечных сетях, где ответ считается на бумаге, и сверка с неизменённым `model.py` Shiu."""
 
+import hashlib
 import importlib.util
 import math
 
@@ -226,3 +227,113 @@ def test_sugar_reaches_mn9_on_real_connectome():
     assert rates[sugar].mean() == pytest.approx(99.0, abs=5)
     assert rates[groups["readouts"]["MN9"]["indices"]].max() > 10
     assert math.isfinite(float(eng.v.sum()))
+
+
+# ---------- P1: доза (снижение порога) и шум мембраны (D-055) ----------
+
+def golden_network() -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+    """Случайная сеть из 400 нейронов с возбуждением и торможением — одна и та же при каждом запуске."""
+    rng = np.random.default_rng(2026)
+    n, m = 400, 6000
+    pre, post = rng.integers(0, n, m), rng.integers(0, n, m)
+    weight = rng.integers(-30, 61, m)
+    weight[weight == 0] = 1
+    _, first = np.unique(post * n + pre, return_index=True)
+    pre, post, weight = pre[first], post[first], weight[first]
+    order = np.lexsort((pre, post))
+    pre, post, weight = pre[order], post[order], weight[order]
+    indptr = np.zeros(n + 1, dtype=np.int64)
+    np.cumsum(np.bincount(post, minlength=n), out=indptr[1:])
+    return indptr, pre.astype(np.int32), weight.astype(np.int16)
+
+
+def golden_spikes_sha(device: str, setup=None) -> str:
+    eng = Engine(*golden_network(), n_trials=4, device=device, seed=7, record_spikes=True)
+    if setup:
+        setup(eng)
+    eng.set_stimulus("a", np.arange(20), 300.0)
+    for steps in (1000, 7, 993):  # целые блоки и куски, не кратные 18 шагам
+        eng.run_steps(steps)
+    return hashlib.sha256(eng.spikes().astype(np.int64).tobytes()).hexdigest()
+
+
+# Отпечатки спайков движка ДО эксперимента P1 (версия кода движка 0df8b8c24b95, 22.10.2026). На процессоре
+# расчёт одинаков на любой машине; на видеокарте порядок сложений зависит от её модели — отпечаток снят на
+# RTX 5070 Laptop и сверяется только на ней.
+GOLDEN_BEFORE_P1 = {
+    "cpu": "20028818a80c2d1d4c55aa2252c40ec545fe26c93731391c014b95a5931ef38a",
+    "cuda:RTX 5070": "c1deb4b92bc599e6c98f14948013b493ebbccd97423aa5d4d3ae5aace48ba546",
+}
+
+
+def _zero_dose(eng: Engine) -> None:
+    eng.set_threshold_shift(np.zeros(eng.n_neurons))
+    eng.set_noise(0.0)
+
+
+def _dose_there_and_back(eng: Engine) -> None:
+    eng.set_threshold_shift(np.full(eng.n_neurons, 0.7))
+    eng.set_noise(1.5)
+    eng.set_threshold_shift(None)
+    eng.set_noise(0.0)
+
+
+@pytest.mark.parametrize("device", DEVICES)
+def test_zero_dose_is_spike_for_spike_the_engine_before_p1(device):
+    # Главное требование P1: при d = 0 и σ = 0 расчёт тот же, что до добавки, бит в бит.
+    plain = golden_spikes_sha(device)
+    assert golden_spikes_sha(device, _zero_dose) == plain
+    assert golden_spikes_sha(device, _dose_there_and_back) == plain
+    if device == "cpu":
+        assert plain == GOLDEN_BEFORE_P1["cpu"]
+    elif "RTX 5070" in torch.cuda.get_device_name():
+        assert plain == GOLDEN_BEFORE_P1["cuda:RTX 5070"]
+
+
+@pytest.mark.parametrize("device", DEVICES)
+def test_threshold_shift_lowers_threshold_and_changes_on_the_fly(device):
+    # S (стимул 10 кГц) стреляет через шаг и даёт B вход 1 синапс: средний g = 0,275 мВ / 0,2 мс × 5 мс =
+    # 6,875 мВ, и v у B стремится к −52 + 6,875 = −45,125 мВ — чуть ниже порога −45. B молчит.
+    # Сдвиг порога 0,5 мВ (порог −45,5) — стреляет; 0,3 мВ (−45,3) — стреляет; 0,05 мВ (−45,05) — снова молчит.
+    eng = Engine(*csr(2, [(0, 1, 1)]), device=device, seed=0, record_spikes=True)
+    eng.set_stimulus("s", [0], EVERY_STEP_HZ)
+
+    def spikes_of_b(steps: int) -> int:
+        before = int(eng.counts[1, 0])
+        eng.run_steps(steps)
+        return int(eng.counts[1, 0]) - before
+
+    assert spikes_of_b(18 * 150) == 0  # 270 мс: v у B вышел на −45,125 мВ
+    assert float(eng.v[1, 0]) == pytest.approx(V0 + 6.875, abs=0.02)
+    for shift_b, fires in ((0.5, True), (0.3, True), (0.05, False)):
+        eng.set_threshold_shift([0.0, shift_b])  # на видеокарте второй и третий раз — в тех же ячейках памяти
+        spikes_of_b(18 * 60)  # после смены порога v у B успевает выйти на своё значение
+        assert (spikes_of_b(18 * 60) > 0) == fires, shift_b
+    eng.set_threshold_shift(None)
+    spikes_of_b(18 * 60)
+    assert spikes_of_b(18 * 60) == 0
+
+
+@pytest.mark.parametrize("device", DEVICES)
+def test_noise_has_standard_deviation_sigma(device):
+    # Отдельные нейроны без связей и без спайков (порог поднят на 100 мВ): за 300 мс (15 постоянных мембраны)
+    # v распределён вокруг покоя со стандартным отклонением ровно σ.
+    n = 6000
+    eng = Engine(*csr(n, []), device=device, seed=11)
+    eng.set_threshold_shift(np.full(n, -100.0))
+    eng.set_noise(2.0)
+    eng.run_ms(300)
+    v = eng.v[:, 0].double().cpu().numpy()
+    assert v.mean() == pytest.approx(V0, abs=0.1)
+    assert v.std() == pytest.approx(2.0, rel=0.04)
+    assert int(eng.counts.sum()) == 0
+
+
+def test_dose_and_noise_bad_inputs_are_errors():
+    eng = engine(2, [(0, 1, 1)])
+    with pytest.raises(EngineError):
+        eng.set_threshold_shift([1.0, 2.0, 3.0])
+    with pytest.raises(EngineError):
+        eng.set_threshold_shift([float("nan"), 0.0])
+    with pytest.raises(EngineError):
+        eng.set_noise(-1.0)

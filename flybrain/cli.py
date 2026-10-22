@@ -55,6 +55,12 @@ def main(argv: list[str] | None = None) -> int:
                           help="где считать движок: auto — видеокарта, если есть (по умолчанию)")
     validate.add_argument("--rerun", action="store_true",
                           help="пересчитать движок заново, даже если готовые результаты подходят")
+    psy = subparsers.add_parser(
+        "psy", help="эксперимент P1 «психоделик»: доза против отклика мозга, таблицы и картинки в docs/psy/")
+    psy.add_argument("--device", choices=["auto", "cuda", "cpu"], default="auto",
+                     help="где считать движок: auto — видеокарта, если есть (по умолчанию)")
+    psy.add_argument("--rerun", action="store_true", help="пересчитать всё заново, даже если готовые расчёты подходят")
+    psy.add_argument("--only", help="только эти части, через запятую: runaway, main, thresholds, spont, broad")
     serve = subparsers.add_parser("serve", help="запустить сервер и открыть 3D-облако нейронов в браузере")
     serve.add_argument("--port", type=int, default=8765, help="порт сервера (по умолчанию 8765)")
     serve.add_argument("--no-browser", action="store_true", help="не открывать браузер автоматически")
@@ -94,6 +100,11 @@ def main(argv: list[str] | None = None) -> int:
         from flybrain.validate import run_validate
 
         return run_validate(device=args.device, rerun=args.rerun)
+    if args.command == "psy":
+        from flybrain.psy import run_psy
+
+        parts = [part.strip() for part in args.only.split(",") if part.strip()] if args.only else None
+        return run_psy(device=args.device, rerun=args.rerun, parts=parts)
     if args.command == "serve":
         from flybrain.server import run_serve
 

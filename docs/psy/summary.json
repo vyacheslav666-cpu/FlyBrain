@@ -1,0 +1,182 @@
+{
+ "criterion": "strict",
+ "serotonin_neurons": {
+  "strict": 62,
+  "broad": 197,
+  "predicted": 2201
+ },
+ "runaway_dose": {
+  "strict": 5.0,
+  "broad": 5.0
+ },
+ "main": {
+  "jon_f_100hz": {
+   "0": {
+    "responders_b2": 96,
+    "active": 22,
+    "n_eff": 15.5,
+    "readout_hz": 0.83,
+    "visual_system": 0,
+    "runaway": false
+   },
+   "1,25": {
+    "responders_b2": 98,
+    "active": 24,
+    "n_eff": 15.9,
+    "readout_hz": 1.1,
+    "visual_system": 0,
+    "runaway": false
+   },
+   "2,5": {
+    "responders_b2": 99,
+    "active": 26,
+    "n_eff": 16.8,
+    "readout_hz": 1.83,
+    "visual_system": 0,
+    "runaway": false
+   },
+   "3,75": {
+    "responders_b2": 101,
+    "active": 32,
+    "n_eff": 17.4,
+    "readout_hz": 2.23,
+    "visual_system": 0,
+    "runaway": false
+   },
+   "5": {
+    "responders_b2": 11139,
+    "active": 9689,
+    "n_eff": 7259.1,
+    "readout_hz": 5.17,
+    "visual_system": 461,
+    "runaway": true
+   }
+  },
+  "shadow_left_100hz": {
+   "0": {
+    "responders_b2": 900,
+    "active": 522,
+    "n_eff": 314.9,
+    "readout_hz": 144.47,
+    "visual_system": 80,
+    "runaway": false
+   },
+   "1,25": {
+    "responders_b2": 1034,
+    "active": 617,
+    "n_eff": 345.4,
+    "readout_hz": 146.1,
+    "visual_system": 89,
+    "runaway": false
+   },
+   "2,5": {
+    "responders_b2": 9687,
+    "active": 4181,
+    "n_eff": 1637.7,
+    "readout_hz": 144.6,
+    "visual_system": 286,
+    "runaway": true
+   },
+   "3,75": {
+    "responders_b2": 11062,
+    "active": 9689,
+    "n_eff": 7155.7,
+    "readout_hz": 127.57,
+    "visual_system": 459,
+    "runaway": true
+   },
+   "5": {
+    "responders_b2": 11633,
+    "active": 10239,
+    "n_eff": 7425.6,
+    "readout_hz": 121.7,
+    "visual_system": 544,
+    "runaway": true
+   }
+  },
+  "sugar_40hz": {
+   "0": {
+    "responders_b2": 271,
+    "active": 71,
+    "n_eff": 54.3,
+    "readout_hz": 2.0,
+    "visual_system": 0,
+    "runaway": false
+   },
+   "1,25": {
+    "responders_b2": 346,
+    "active": 125,
+    "n_eff": 86.3,
+    "readout_hz": 4.33,
+    "visual_system": 4,
+    "runaway": false
+   },
+   "2,5": {
+    "responders_b2": 407,
+    "active": 282,
+    "n_eff": 189.3,
+    "readout_hz": 15.13,
+    "visual_system": 4,
+    "runaway": false
+   },
+   "3,75": {
+    "responders_b2": 449,
+    "active": 297,
+    "n_eff": 200.4,
+    "readout_hz": 16.63,
+    "visual_system": 4,
+    "runaway": false
+   },
+   "5": {
+    "responders_b2": 10640,
+    "active": 6385,
+    "n_eff": 5556.8,
+    "readout_hz": 16.03,
+    "visual_system": 374,
+    "runaway": true
+   }
+  },
+  "water_200hz": {
+   "0": {
+    "responders_b2": 353,
+    "active": 203,
+    "n_eff": 114.4,
+    "readout_hz": 29.53,
+    "visual_system": 2,
+    "runaway": false
+   },
+   "1,25": {
+    "responders_b2": 398,
+    "active": 257,
+    "n_eff": 134.7,
+    "readout_hz": 31.43,
+    "visual_system": 2,
+    "runaway": false
+   },
+   "2,5": {
+    "responders_b2": 453,
+    "active": 296,
+    "n_eff": 160.9,
+    "readout_hz": 30.67,
+    "visual_system": 5,
+    "runaway": false
+   },
+   "3,75": {
+    "responders_b2": 697,
+    "active": 353,
+    "n_eff": 195.5,
+    "readout_hz": 26.97,
+    "visual_system": 37,
+    "runaway": false
+   },
+   "5": {
+    "responders_b2": 11426,
+    "active": 10095,
+    "n_eff": 7361.4,
+    "readout_hz": 3.6,
+    "visual_system": 468,
+    "runaway": true
+   }
+  }
+ }
+}
