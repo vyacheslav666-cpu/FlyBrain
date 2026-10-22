@@ -178,10 +178,6 @@ html, body {
 #card.collapsed { height: auto !important; }
 #card.collapsed .card-body, #card.collapsed .card-grip { display: none; }
 #card.collapsed .card-bar { padding-bottom: 8px; }
-.card-grip { border-bottom-right-radius: 10px; }
-body.card-moving, body.card-moving * { cursor: move !important; user-select: none; }
-body.card-sizing, body.card-sizing * { cursor: nwse-resize !important; user-select: none; }
-body.card-sizing .card-grip { --grip: #5ff0ff; }
 .neuron-head { display: flex; flex-direction: column; gap: 2px; margin-bottom: 8px; padding-right: 18px; }
 .neuron-label { font-size: 16px; }
 .neuron-about { color: var(--muted); font-size: 12px; }
@@ -495,24 +491,26 @@ span.partner-label { color: var(--muted); }
 /* Уголок размера (D-042): две косые полоски в углу, как у карточки нейрона. */
 .corner-grip {
   --grip: rgba(255, 255, 255, 0.28);
-  --grip-angle: 135deg;
   position: absolute;
   z-index: 2;
   width: 18px;
   height: 18px;
   touch-action: none;
-  background: linear-gradient(var(--grip-angle), transparent 50%, var(--grip) 50%, var(--grip) 58%, transparent 58%,
+  background: linear-gradient(135deg, transparent 50%, var(--grip) 50%, var(--grip) 58%, transparent 58%,
     transparent 70%, var(--grip) 70%, var(--grip) 78%, transparent 78%);
 }
 .corner-grip:hover, .corner-grip.active { --grip: #5ff0ff; }
-.grip-br { right: 0; bottom: 0; --grip-angle: 135deg; cursor: nwse-resize; border-bottom-right-radius: 10px; }
-.grip-bl { left: 0; bottom: 0; --grip-angle: 225deg; cursor: nesw-resize; border-bottom-left-radius: 10px; }
-.grip-tr { right: 0; top: 0; --grip-angle: 45deg; cursor: nesw-resize; border-top-right-radius: 10px; }
-.grip-tl { left: 0; top: 0; --grip-angle: 315deg; cursor: nwse-resize; border-top-left-radius: 10px; }
-body.sizing-nwse, body.sizing-nwse * { cursor: nwse-resize !important; user-select: none; }
-body.sizing-nesw, body.sizing-nesw * { cursor: nesw-resize !important; user-select: none; }
+.grip-br { right: 0; bottom: 0; cursor: nwse-resize; border-bottom-right-radius: 10px; }
+/* Заголовок, за который окошко двигают (D-043), и курсор, пока тянут. */
+.drag-handle { cursor: move; user-select: none; touch-action: none; }
+body.moving, body.moving * { cursor: move !important; user-select: none; }
+body.sizing, body.sizing * { cursor: nwse-resize !important; user-select: none; }
+/* Панели — поверх подсказки внизу (их можно утащить на неё); та, которой коснулись последней, — поверх других панелей.
+   Карточка нейрона (4) и подсказка у курсора (5) всё равно выше. */
+.resizable { z-index: 2; }
+.resizable.raised { z-index: 3; }
 /* Кнопка «−» в правом верхнем углу сворачивает панель до заголовка. Она стоит левее полосы прокрутки,
-   а у «Вида» — ещё и левее уголка размера. */
+   а у «Вида» компас подвинут, чтобы её не закрывать. */
 .panel-collapse {
   position: absolute;
   top: 6px;
@@ -531,13 +529,11 @@ body.sizing-nesw, body.sizing-nesw * { cursor: nesw-resize !important; user-sele
   cursor: pointer;
 }
 .panel-collapse:hover { color: var(--text) !important; background: rgba(255, 255, 255, 0.08) !important; }
-#view .panel-collapse { right: 24px; }
 #view #compass { margin-right: 26px; }
 .panel-collapsed-title { display: none; padding: 9px 40px 9px 14px; font-size: 13px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: 0.06em; }
 .resizable.collapsed { height: auto !important; }
 .resizable.collapsed .panel-body, .resizable.collapsed .corner-grip { display: none !important; } /* у «Вида» обёртка — flex с id в правиле */
 .resizable.collapsed .panel-collapsed-title { display: block; }
-#view.collapsed .panel-collapse { right: 8px; }
 
 /* Кнопка «Скрыть панели» (H): на узком окне панели не оставляют места облаку, поэтому там они сначала скрыты.
    Компас остаётся в углу: он нужен именно тогда, когда смотришь на мозг без панелей. */
@@ -567,7 +563,7 @@ body.panels-hidden .resizable .corner-grip,
 body.panels-hidden .panel-collapse,
 body.panels-hidden .resizable .panel-collapsed-title { display: none; }
 body.panels-hidden #view.collapsed .panel-body { display: flex !important; } /* компас остаётся и у свёрнутого «Вида» */
-body.panels-hidden #view { background: none; border: 0; backdrop-filter: none; width: auto; height: auto !important; max-height: none; }
+body.panels-hidden #view { background: none; border: 0; backdrop-filter: none; width: auto !important; height: auto !important; max-height: none !important; }
 body.panels-hidden #view .panel-body { padding: 0; overflow: visible; }
 @media (max-width: 760px) {
   #search { width: min(420px, calc(100vw - 290px)); } /* между названием слева и кнопкой «Скрыть панели» справа */

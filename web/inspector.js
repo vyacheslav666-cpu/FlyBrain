@@ -2,7 +2,7 @@
 // Строку «Частота сейчас» заполняет main.js по потоку живого мозга (C9).
 // Карточку можно двигать, сворачивать и менять её размер (floating.js, D-041).
 
-import { makeFloating } from "./floating.js";
+import { makeFloating, storedObject } from "./floating.js";
 
 const infoCache = new Map();
 const linksCache = new Map();
@@ -122,7 +122,11 @@ export function createCard(root, { onClose, onSelect }) {
   const grip = element("div", "card-grip corner-grip grip-br");
   grip.title = "Потяните, чтобы изменить размер карточки";
   root.replaceChildren(bar, body, grip);
-  const floating = makeFloating(root, { bar, grip, collapseButton: collapse });
+  const stored = storedObject("flybrain.card");
+  const floating = makeFloating(root, {
+    handles: [bar], grip, collapseButton: collapse, state: stored.value, save: stored.save,
+    noun: "карточку", minWidth: 260, minHeight: 140,
+  });
 
   return {
     showInfo(info) {
