@@ -1,11 +1,15 @@
-// Плавающие окошки: карточка нейрона (D-041) и все панели (D-043). Окошко двигают за полосу с точками
-// у левого края (D-044) или за заголовок,
-// размер меняют за уголок справа внизу, кнопка «−» сворачивает его до заголовка.
-// Двойной щелчок по заголовку возвращает обычное место и размер, по уголку — обычный размер.
+// Плавающие окошки: карточка нейрона (D-041) и все панели (D-043). Управление — как у окна Windows (D-051):
+// курсор на самой границе окошка — тянуть, чтобы изменить размер (любая сторона или угол);
+// курсор внутри, у края (в рамке вокруг содержимого) — тянуть, чтобы передвинуть. За заголовок тоже можно двигать.
+// Двойной щелчок в рамке — обычное место и размер, на границе — только обычный размер. Кнопка «−» сворачивает до заголовка.
 // Пока окошко не трогали, оно стоит там, где его ставит style.css; первое касание закрепляет его левым верхним углом.
 
 const MARGIN_PX = 8;
 const KEEP_VISIBLE_PX = 32; // столько от заголовка всегда остаётся в окне браузера, чтобы окошко можно было вытащить обратно
+const EDGE_PX = 6; // ширина границы, за которую меняют размер; дальше внутрь до содержимого — рамка для перетаскивания
+
+const CURSORS = { n: "ns-resize", s: "ns-resize", e: "ew-resize", w: "ew-resize", ne: "nesw-resize", sw: "nesw-resize",
+  nw: "nwse-resize", se: "nwse-resize", move: "move" };
 
 /** Запомненное в браузере (localStorage) по ключу; если хранилище недоступно, всё работает без запоминания. */
 export function storedObject(key) {
@@ -36,17 +40,14 @@ function raise(root) {
 }
 
 /**
- * Окошко `root`: заголовки `handles` (за них двигают), уголок `grip`, кнопка `collapseButton`.
+ * Окошко `root`: заголовки `handles` (за них тоже двигают), кнопка `collapseButton`.
  * `state` — объект, куда пишутся left/top/width/height/collapsed; `save()` сохраняет его. `noun` — «карточку» или «панель».
  * Возвращает `fit()` — расставить заново (например, когда окошко показали).
  */
-export function makeFloating(root, { handles, grip, collapseButton, state, save, noun, minWidth, minHeight }) {
+export function makeFloating(root, { handles, collapseButton, state, save, noun, minWidth, minHeight }) {
   const has = (key) => Number.isFinite(state[key]);
-  // Полоса с точками вдоль левого края — за неё окошко двигают (как за заголовок).
-  const strip = document.createElement("div");
-  strip.className = "move-strip";
-  strip.title = `Потяните, чтобы передвинуть ${noun}. Двойной щелчок — обычное место и размер`;
-  root.append(strip);
+  root.classList.add("floating");
+  for (const handle of handles) handle.classList.add("drag-handle");
 
   // Если окно браузера стало меньше, окошко подвигается и сужается только на экране, а запомненное не меняется:
   // окно снова станет большим — окошко вернётся туда, где было.
@@ -74,70 +75,100 @@ export function makeFloating(root, { handles, grip, collapseButton, state, save,
     collapseButton.title = state.collapsed ? `развернуть ${noun}` : `свернуть ${noun} (останется только заголовок)`;
   }
 
-  /** Перед тем как тянуть, закрепляем место левым верхним углом: тогда уголок справа внизу тянет вправо и вниз. */
-  function anchor() {
+  /**
+   * Что сделает нажатие в этой точке: «n», «se» и т. п. — менять размер за эту сторону или угол; «move» — двигать;
+   * null — ничего (курсор над содержимым, кнопкой или ползунком). Рамка — это само окошко вокруг содержимого.
+   */
+  function zoneAt(event) {
+    const onHandle = handles.some((handle) => handle.contains(event.target)) && !event.target.closest("button");
+    if (event.target !== root && !onHandle) return null;
     const rect = root.getBoundingClientRect();
+    const vertical = state.collapsed ? "" // у свёрнутого окошка высота сама по себе
+      : event.clientY - rect.top < EDGE_PX ? "n" : rect.bottom - event.clientY < EDGE_PX ? "s" : "";
+    const horizontal = event.clientX - rect.left < EDGE_PX ? "w" : rect.right - event.clientX < EDGE_PX ? "e" : "";
+    return vertical + horizontal || "move";
+  }
+
+  // Курсор и подсветка рамки подсказывают, что сейчас будет: стрелки — размер, крестик — перетаскивание.
+  let drag = null;
+  root.addEventListener("pointermove", (event) => {
+    if (drag) return;
+    const zone = zoneAt(event);
+    root.style.cursor = zone ? CURSORS[zone] : "";
+    root.classList.toggle("frame-hot", zone !== null && zone !== "move");
+  });
+  root.addEventListener("pointerleave", () => {
+    if (drag) return;
+    root.style.cursor = "";
+    root.classList.remove("frame-hot");
+  });
+
+  root.addEventListener("pointerdown", (event) => {
+    raise(root);
+    if (event.button !== 0) return;
+    const zone = zoneAt(event);
+    if (!zone) return;
+    event.preventDefault();
+    root.setPointerCapture(event.pointerId);
+    const rect = root.getBoundingClientRect();
+    // Закрепляем место левым верхним углом: дальше и движение, и размер считаются от него.
     state.left = rect.left;
     state.top = rect.top;
-  }
-
-  function track(handle, cursorClass, onMove) {
-    let start = null;
-    handle.addEventListener("pointerdown", (event) => {
-      if (event.button !== 0 || event.target.closest("button")) return;
-      event.preventDefault();
-      handle.setPointerCapture(event.pointerId);
-      anchor();
-      const rect = root.getBoundingClientRect();
-      start = { x: event.clientX, y: event.clientY, left: state.left, top: state.top, width: rect.width, height: rect.height };
-      document.body.classList.add(cursorClass);
-      handle.classList.add("active");
-    });
-    handle.addEventListener("pointermove", (event) => {
-      if (!start) return;
-      onMove(event.clientX - start.x, event.clientY - start.y, start);
-      place();
-    });
-    const finish = () => {
-      if (!start) return;
-      start = null;
-      document.body.classList.remove(cursorClass);
-      handle.classList.remove("active");
-      save();
-    };
-    handle.addEventListener("pointerup", finish);
-    handle.addEventListener("pointercancel", finish);
-  }
-
-  for (const handle of [strip, ...handles]) {
-    handle.classList.add("drag-handle");
-    track(handle, "moving", (dx, dy, start) => {
-      state.left = start.left + dx;
-      state.top = start.top + dy;
-    });
-    handle.addEventListener("dblclick", (event) => {
-      if (event.target.closest("button")) return;
-      for (const key of ["left", "top", "width", "height"]) delete state[key];
-      save();
-      place();
-    });
-  }
-  track(grip, "sizing", (dx, dy, start) => {
-    state.width = Math.max(minWidth, start.width + dx);
-    state.height = Math.max(minHeight, Math.min(start.height + dy, window.innerHeight - start.top - MARGIN_PX));
+    drag = { zone, x: event.clientX, y: event.clientY, left: rect.left, top: rect.top, width: rect.width, height: rect.height };
+    document.body.style.cursor = CURSORS[zone];
+    document.body.classList.add("dragging-window");
   });
-  grip.addEventListener("dblclick", () => {
-    delete state.width;
-    delete state.height;
+
+  root.addEventListener("pointermove", (event) => {
+    if (!drag) return;
+    const dx = event.clientX - drag.x;
+    const dy = event.clientY - drag.y;
+    const { zone } = drag;
+    if (zone === "move") {
+      state.left = drag.left + dx;
+      state.top = drag.top + dy;
+    } else {
+      if (zone.includes("e")) state.width = Math.max(minWidth, drag.width + dx);
+      if (zone.includes("w")) {
+        state.width = Math.max(minWidth, drag.width - dx);
+        state.left = drag.left + drag.width - state.width; // правый край стоит на месте
+      }
+      if (zone.includes("s")) {
+        state.height = Math.max(minHeight, Math.min(drag.height + dy, window.innerHeight - drag.top - MARGIN_PX));
+      }
+      if (zone.includes("n")) {
+        const bottom = drag.top + drag.height; // нижний край стоит на месте
+        state.height = Math.max(minHeight, Math.min(drag.height - dy, bottom - MARGIN_PX));
+        state.top = bottom - state.height;
+      }
+    }
+    place();
+  });
+
+  const finish = () => {
+    if (!drag) return;
+    drag = null;
+    document.body.style.removeProperty("cursor");
+    document.body.classList.remove("dragging-window");
+    save();
+  };
+  root.addEventListener("pointerup", finish);
+  root.addEventListener("pointercancel", finish);
+
+  root.addEventListener("dblclick", (event) => {
+    const zone = zoneAt(event);
+    if (!zone) return;
+    const keys = zone === "move" ? ["left", "top", "width", "height"] : ["width", "height"];
+    for (const key of keys) delete state[key];
     save();
     place();
   });
+
   collapseButton.addEventListener("click", () => {
     state.collapsed = !state.collapsed;
     save();
     place();
   });
-  root.addEventListener("pointerdown", () => raise(root), true);
   window.addEventListener("resize", () => place());
   place();
 

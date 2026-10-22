@@ -119,12 +119,10 @@ export function createCard(root, { onClose, onSelect }) {
   close.addEventListener("click", onClose);
   bar.append(title, collapse, close);
   const body = element("div", "card-body");
-  const grip = element("div", "card-grip corner-grip grip-br");
-  grip.title = "Потяните, чтобы изменить размер карточки";
-  root.replaceChildren(bar, body, grip);
+  root.replaceChildren(bar, body);
   const stored = storedObject("flybrain.card");
   const floating = makeFloating(root, {
-    handles: [bar], grip, collapseButton: collapse, state: stored.value, save: stored.save,
+    handles: [bar], collapseButton: collapse, state: stored.value, save: stored.save,
     noun: "карточку", minWidth: 260, minHeight: 140,
   });
 
