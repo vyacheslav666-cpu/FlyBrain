@@ -1,8 +1,8 @@
 // Панели — плавающие окошки, как карточка нейрона (D-038, D-042, D-043, D-051): за границу — менять размер,
 // за рамку у края или за заголовок — двигать, кнопка «−» сворачивает до заголовка. Пока панель не трогали, она стоит в своём углу экрана (style.css).
-// Всё запоминается в браузере (localStorage).
+// Место и размер не запоминаются: после перезагрузки панели снова в своих углах (D-052).
 
-import { makeFloating, storedObject } from "./floating.js";
+import { forgetSavedLayout, makeFloating } from "./floating.js";
 
 const PANEL_IDS = ["stimuli", "executors", "view", "live"];
 
@@ -15,9 +15,7 @@ function wrapContent(panel) {
 }
 
 export function createPanelResizers() {
-  const stored = storedObject("flybrain.panels");
-  // До D-042 хранилась только высота числом.
-  for (const [id, value] of Object.entries(stored.value)) if (typeof value === "number") stored.value[id] = { height: value };
+  forgetSavedLayout("flybrain.panels");
 
   for (const id of PANEL_IDS) {
     const panel = document.getElementById(id);
@@ -37,9 +35,7 @@ export function createPanelResizers() {
     panel.append(collapse);
 
     makeFloating(panel, {
-      handles: [heading, title], collapseButton: collapse,
-      state: (stored.value[id] ??= {}), save: stored.save,
-      noun: "панель", minWidth: 220, minHeight: 70,
+      handles: [heading, title], collapseButton: collapse, noun: "панель", minWidth: 220, minHeight: 70,
     });
 
     if (id === "executors") {

@@ -3,6 +3,7 @@
 // курсор внутри, у края (в рамке вокруг содержимого) — тянуть, чтобы передвинуть. За заголовок тоже можно двигать.
 // Двойной щелчок в рамке — обычное место и размер, на границе — только обычный размер. Кнопка «−» сворачивает до заголовка.
 // Пока окошко не трогали, оно стоит там, где его ставит style.css; первое касание закрепляет его левым верхним углом.
+// Место, размер и «свёрнуто» живут до перезагрузки страницы: при запуске всё стоит по умолчанию (D-052).
 
 const MARGIN_PX = 8;
 const KEEP_VISIBLE_PX = 32; // столько от заголовка всегда остаётся в окне браузера, чтобы окошко можно было вытащить обратно
@@ -11,24 +12,14 @@ const EDGE_PX = 6; // ширина границы, за которую меня�
 const CURSORS = { n: "ns-resize", s: "ns-resize", e: "ew-resize", w: "ew-resize", ne: "nesw-resize", sw: "nesw-resize",
   nw: "nwse-resize", se: "nwse-resize", move: "move" };
 
-/** Запомненное в браузере (localStorage) по ключу; если хранилище недоступно, всё работает без запоминания. */
-export function storedObject(key) {
-  let value = {};
+/** До D-052 место и размер окошек запоминались в браузере. Теперь при каждом запуске они стоят по умолчанию,
+ *  поэтому старые записи стираем, чтобы не лежали зря. */
+export function forgetSavedLayout(key) {
   try {
-    value = JSON.parse(localStorage.getItem(key)) ?? {};
+    localStorage.removeItem(key);
   } catch {
-    // нет хранилища или в нём мусор — начинаем с пустого
+    // хранилище недоступно — и стирать нечего
   }
-  return {
-    value,
-    save() {
-      try {
-        localStorage.setItem(key, JSON.stringify(value));
-      } catch {
-        // нет места или запрещено — не страшно
-      }
-    },
-  };
 }
 
 let raisedRoot = null;
@@ -41,10 +32,11 @@ function raise(root) {
 
 /**
  * Окошко `root`: заголовки `handles` (за них тоже двигают), кнопка `collapseButton`.
- * `state` — объект, куда пишутся left/top/width/height/collapsed; `save()` сохраняет его. `noun` — «карточку» или «панель».
+ * `noun` — «карточку» или «панель».
  * Возвращает `fit()` — расставить заново (например, когда окошко показали).
  */
-export function makeFloating(root, { handles, collapseButton, state, save, noun, minWidth, minHeight }) {
+export function makeFloating(root, { handles, collapseButton, noun, minWidth, minHeight }) {
+  const state = {}; // left/top/width/height/collapsed — только пока страница открыта
   const has = (key) => Number.isFinite(state[key]);
   root.classList.add("floating");
   for (const handle of handles) handle.classList.add("drag-handle");
@@ -150,7 +142,6 @@ export function makeFloating(root, { handles, collapseButton, state, save, noun,
     drag = null;
     document.body.style.removeProperty("cursor");
     document.body.classList.remove("dragging-window");
-    save();
   };
   root.addEventListener("pointerup", finish);
   root.addEventListener("pointercancel", finish);
@@ -160,13 +151,11 @@ export function makeFloating(root, { handles, collapseButton, state, save, noun,
     if (!zone) return;
     const keys = zone === "move" ? ["left", "top", "width", "height"] : ["width", "height"];
     for (const key of keys) delete state[key];
-    save();
     place();
   });
 
   collapseButton.addEventListener("click", () => {
     state.collapsed = !state.collapsed;
-    save();
     place();
   });
   window.addEventListener("resize", () => place());

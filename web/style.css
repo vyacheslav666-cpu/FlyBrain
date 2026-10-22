@@ -488,7 +488,7 @@ span.partner-label { color: var(--muted); }
 .resizable[hidden] { display: none; }
 /* Вокруг обёртки — рамка 12 px без содержимого (D-051): за неё панель двигают, а за самую границу — меняют размер.
    Полоса прокрутки — внутри обёртки, поэтому рамку не задевает. */
-.panel-body { flex: 1 1 auto; min-height: 0; overflow-y: auto; margin: 12px; padding: 0 2px; color-scheme: dark; }
+.panel-body { flex: 1 1 auto; min-height: 0; overflow-x: hidden; overflow-y: auto; margin: 12px; padding: 0 2px; color-scheme: dark; }
 /* В «Виде» лишняя высота достаётся списку легенды. */
 #view .panel-body { display: flex; flex-direction: column; }
 #view #legend:not([hidden]) { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; }
