@@ -462,8 +462,8 @@ span.partner-label { color: var(--muted); }
   text-align: center;
   pointer-events: none;
 }
-#active-hint { bottom: calc(var(--bottom-gap) + 100px); color: var(--muted); }
-#toast { bottom: calc(var(--bottom-gap) + 144px); border-color: rgba(95, 240, 255, 0.5); }
+#active-hint { bottom: calc(var(--bottom-gap) + 108px); color: var(--muted); }
+#toast { bottom: calc(var(--bottom-gap) + 152px); border-color: rgba(95, 240, 255, 0.5); }
 #active-hint[hidden], #toast[hidden], #fps[hidden] { display: none; }
 
 #fps {
