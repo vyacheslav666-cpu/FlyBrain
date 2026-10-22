@@ -12,6 +12,7 @@ import numpy as np
 import torch
 
 from flybrain.docpage import DOCS_DIR, VALIDATION_SUMMARY
+from flybrain.mirror import REASONS_RU
 from flybrain.paths import PROJECT_ROOT
 from flybrain.reference import ACTIVE_HZ
 from flybrain.validate import BOUNDARY, BOUNDARY_SE, CORR_MIN, FAIL, INFO, ITEMS, KEY_ABS_HZ, KEY_REL, MARKS, \
@@ -22,10 +23,14 @@ FIGURES_DIR = PROJECT_ROOT / "docs" / "validation"
 FIGURE_RATES = "a_rates.png"
 FIGURE_B2 = "b2_counts.png"
 FIGURE_KEYS = "b_key_neurons.png"
+FIGURE_MIRROR = "e_mirror.png"
 
 # Цвета — палитра по умолчанию навыка dataviz, светлая тема; три цвета проверены скриптом validate_palette.js.
 SURFACE, INK, INK_2, MUTED, GRID, AXIS = "#fcfcfb", "#0b0b0b", "#52514e", "#898781", "#e1e0d9", "#c3c2b7"
 COLOR_REFERENCE, COLOR_ENGINE, COLOR_PAPER = "#2a78d6", "#eb6834", "#1baf7a"
+# Раздел Е: стимул слева и стимул справа (слоты 7 и 4 палитры; пара проверена тем же скриптом, у жёлтого низкий
+# контраст с фоном — поэтому у каждого столбика подписано число). Синий и оранжевый заняты эталоном и движком.
+COLOR_LEFT, COLOR_RIGHT = "#6250d6", "#eda100"
 
 # Что ждём по статье, по какому правилу решаем, и пояснения — для каждого пункта (правила D-031).
 TEXTS = {
@@ -251,6 +256,10 @@ def _summary_lines(results: Results) -> list[str]:
                 lines[-1] += (" Числа эталона и движка отличаются в пределах случайности." if same else
                               " Числа эталона и движка отличаются больше чем на две погрешности.")
     lines.append(f"- **В (тень):** {_shadow_words(*verdicts['В'], short=True)}")
+    if results.mirror:
+        for result in results.mirror.results:
+            lines.append(f"- **Е, {result.name_ru.lower()} справа:** двойников {result.twins} (для {result.paired} из "
+                         f"{result.listed} нейронов левого списка); кнопка «правая сторона» {mirror_decision(result)}.")
     return lines
 
 
@@ -322,6 +331,212 @@ def _shadow_words(reference: Verdict, engine: Verdict, short: bool = False) -> s
             "насколько он похож на реакцию живой мухи, этот опыт не говорит.")
 
 
+# ---------- раздел Е: правая сторона для горечи и усика (D-047) ----------
+
+def _ratio(left: float, right: float) -> str:
+    """Справа в процентах от слева (у чисел одного знака)."""
+    if left == 0 and right == 0:
+        return "—"
+    if left == 0 or (right != 0 and (left > 0) != (right > 0)):
+        return "не сравнить"
+    return f"{number(100 * right / left, 0)} %"
+
+
+def _stats_table(rows) -> list[str]:
+    lines = ["| Набор | Нейронов | Типы клеток | Всего выходных синапсов | На все моторные | На все нисходящие "
+             "| К MN9 через один нейрон: своя / другая сторона |",
+             "|---|---|---|---|---|---|---|"]
+    for row in rows:
+        types = ", ".join(f"{name} {count}" for name, count in row.types.items()) or "—"
+        two = row.mn9_two_step
+        two_text = f"{number(two['своя'], 0)} / {number(two['другая'], 0)}" if two else "—"
+        lines.append(f"| {row.label} | {row.count} | {types} | {number(row.output, 0)} | {number(row.to_motor, 0)} "
+                     f"| {number(row.to_descending, 0)} | {two_text} |")
+    for left, right in zip(rows[::2], rows[1::2]):
+        if not right.count:
+            continue
+        two_l, two_r = left.mn9_two_step, right.mn9_two_step
+        lines.append(f"| *{right.label}: в % от «{left.label}»* | {_ratio(left.count, right.count)} "
+                     f"| {len(right.types)} из {len(left.types)} | {_ratio(left.output, right.output)} "
+                     f"| {_ratio(left.to_motor, right.to_motor)} | {_ratio(left.to_descending, right.to_descending)} "
+                     f"| {_ratio(two_l['своя'], two_r['своя'])} / {_ratio(two_l['другая'], two_r['другая'])} |")
+    return lines
+
+
+def _direct_keys_line(rows) -> str:
+    """Прямые синапсы на ключевых исполнителей: у вкусовых нейронов их обычно нет вовсе."""
+    parts = []
+    for row in rows:
+        nonzero = [f"{name} — {number(value, 0)}" for name, value in row.to_keys.items() if value]
+        if nonzero:
+            parts.append(f"{row.label}: {', '.join(nonzero)}")
+    if not parts:
+        return "Прямых синапсов на ключевых исполнителей (MN9, aDN1, aDN2, aBN1, GF) ни у одного набора нет."
+    return ("Прямые синапсы на ключевых исполнителей (MN9, aDN1, aDN2, aBN1, GF; «своя» — сторона стимула): "
+            + "; ".join(parts) + ". У остальных наборов их нет.")
+
+
+def _twins_table(result) -> list[str]:
+    lines = ["| Тип клетки | В левом списке статьи | Всего слева | Всего справа | Двойники справа | Почему нет |",
+             "|---|---|---|---|---|---|"]
+    for match in result.matches:
+        twins = len(match["twins"])
+        lines.append(f"| {match['cell_type'] or 'без типа'} | {len(match['listed'])} | {match['left_total']} "
+                     f"| {match['right_total']} | {f'{MARKS[PASS]} {twins}' if twins else '—'} "
+                     f"| {REASONS_RU.get(match['reason'], '')} |")
+    return lines
+
+
+def _targets_table(targets) -> list[str]:
+    lines = ["| Цель | Стимул слева | Стимул справа | Расхождение |", "|---|---|---|---|"]
+    for target in targets:
+        lines.append(f"| {target.label} | {target.left_text} | {target.right_text} "
+                     f"| {number(target.discrepancy, 2)} |")
+    return lines
+
+
+def mirror_decision(result) -> str:
+    """Решение по кнопке «правая сторона» одной фразой (D-047)."""
+    if result.include:
+        return "включена"
+    return f"не включена: {'; '.join(result.reasons)}"
+
+
+def _mirror_mark(result) -> str:
+    return f"{MARKS[PASS if result.include else FAIL]} {mirror_decision(result)}"
+
+
+def _mirror_lines(results: Results) -> list[str]:
+    check = results.mirror
+    sugar = check.sugar_discrepancy
+    sugar_section = f"Е{len(check.results) + 1}"
+    lines = [
+        "## Е. Правая сторона для «Горечи» и «Касания усика» (D-047)",
+        "",
+        "В статье списки нейронов горечи и Джонстонова органа (усик) есть только для левой стороны мухи. Правых "
+        "двойников ищем по таблице аннотаций FlyWire 783 — тип клетки + сторона — по правилу D-047: для каждого "
+        "типа клеток левого списка двойники однозначны, только если список статьи берёт **весь** тип на левой "
+        "стороне, а на правой нейронов этого типа **ровно столько же**; тогда двойники — все правые нейроны "
+        "типа. Иначе тип справа не представлен: вручную ничего не подбираем.",
+        "",
+        "Перед тем как включить кнопку, сравниваем наборы нейронов (для сведения) и повторяем опыт Б-серии "
+        f"зеркально. Мерило — сахар: для него в статье есть списки обеих сторон (D-034, раздел {sugar_section}). "
+        "**Кнопка включается**, только если двойники есть, на правой стороне опыт даёт тот же вывод, что на "
+        "левой, и расхождение не больше, чем у сахара. Расхождение для одной цели — 1 − (меньшее / большее) из "
+        "чисел «слева» и «справа»: 0 — одинаково, 1 — одна сторона ничего не делает; у стимула берётся "
+        "наибольшее из целей. Считает только движок (по пункту А он совпадает с эталоном Brian2); прогонов "
+        "Brian2 для этих условий нет. Правило и порог записаны до расчётов.",
+        "",
+        f"| Стимул | Двойники справа | Опыт справа | Расхождение (у сахара — {number(sugar, 2)}) "
+        "| Кнопка «правая сторона» |",
+        "|---|---|---|---|---|",
+    ]
+    figure = [f"![Сахар и горечь слева и справа: MN9](validation/{FIGURE_MIRROR})", "",
+              "*Фиолетовый — стимулы на левой стороне мухи, жёлтый — на правой. Цели правых стимулов — зеркальные: "
+              "«противоположная сторона» у левого стимула — правый MN9, у правого — левый.*", ""]
+    for result in check.results:
+        found = [match["cell_type"] for match in result.matches if match["twins"]]
+        twins = f"{result.twins} — для {result.paired} из {result.listed} нейронов левого списка"
+        if found:
+            twins += f" (тип {', '.join(found)})"
+        right = _mark(result.right.state) if result.right else "—"
+        gap = number(result.discrepancy, 2) if result.discrepancy is not None else "—"
+        lines.append(f"| {result.name_ru} | {twins} | {right} | {gap} | {_mirror_mark(result)} |")
+    lines += ["", *figure]
+    for position, result in enumerate(check.results, start=1):
+        lines += [f"### Е{position}. {result.name_ru}", "", "**Двойники.**", "", *_twins_table(result), "",
+                  f"**Наборы нейронов** (для сведения, без порога; сахар — в разделе {sugar_section}). Синапсы — "
+                  "со знаком модели: минус — торможение. «К MN9 через один нейрон» — сумма по всем промежуточным "
+                  "нейронам: синапсы набора на промежуточный × синапсы промежуточного на MN9.", "",
+                  *_stats_table(result.stats), "", _direct_keys_line(result.stats), ""]
+        if result.right:
+            lines += ["**Опыт: зеркало Б3** — сахар 100 Гц и «сахар 100 + горечь 200 Гц» на одной стороне; правило "
+                      "Б3 — для MN9 на противоположной стороне.", ""]
+            for name, verdict in (("Стимулы слева (как в основной проверке)", result.left),
+                                  ("Стимулы справа (сахар — список статьи, горечь — двойники)", result.right)):
+                lines.append(f"- **{name}** — {_mark(verdict.state)}")
+                lines += [f"  - {line}" for line in verdict.numbers]
+                lines += _tests_lines(verdict)
+            lines += ["", "Что делает горечь: какую долю ответа MN9 на сахар своей стороны она убирает.", "",
+                      *_targets_table(result.targets), "",
+                      "Для сведения, на решение не влияет: при сахаре справа 100 Гц ответ MN9 маленький, поэтому тот "
+                      "же опыт повторён при сахаре справа 200 Гц, где правый список сахара включает MN9 заметно "
+                      "(D-034).", ""]
+            lines += [f"- {line}" for line in result.info]
+            lines.append("")
+        if result.explain:
+            lines += ["**[ЧЕСТНОСТЬ] Для объяснения — добавлено после того, как увидели результат, на решение не "
+                      "влияет.** Двойники нашлись только для части левого списка. Тот же опыт слева, но горечью "
+                      "включены только эти нейроны (тип LB1a, `bitter_paired_left`):", ""]
+            lines += [f"- {line}" for line in result.explain]
+            lines.append("")
+        lines += [f"**Решение.** Кнопка «правая сторона» — {_mirror_mark(result)}.", ""]
+    lines += [f"### {sugar_section}. Мерило: сахар слева и справа", "",
+              "Оба списка — из статьи: левый `neu_sugar` и правый `neu_sugar_left` (рис. S1D; у Shiu он назван "
+              "«left», а по нынешней таблице он правый, D-034). Опыт — зеркало Б1, сахар 100 Гц.", "",
+              *_stats_table(check.sugar_stats), "", _direct_keys_line(check.sugar_stats), "",
+              *_targets_table(check.sugar_targets), "",
+              f"Расхождение сахара — **{number(sugar, 2)}**: это порог для горечи и усика.", "",
+              "**[ЧЕСТНОСТЬ]** Правые наборы горечи и усика — не списки статьи, а наш перенос по правилу D-047. "
+              "Двойники одного типа включаются все вместе: кто чей двойник внутри типа, таблица не говорит. Левые "
+              "нейроны без однозначного двойника справа не представлены, поэтому правая кнопка слабее левой. "
+              "Сравнение наборов отметки не ставит (D-047): число и состав нейронов задаёт правило двойников, а "
+              "как набор действует на мозг, показывает опыт.", ""]
+    return lines
+
+
+def figure_mirror(results: Results, path: Path) -> None:
+    """Раздел Е: сахар и горечь слева и справа — частоты MN9 и доля ответа, которую убирает горечь."""
+    import matplotlib.pyplot as plt
+    from matplotlib.patches import Patch
+
+    check = results.mirror
+    bitter = next((result for result in check.results if result.right), None)
+    names = ("MN9 напротив стимула", "MN9 на стороне стимула")  # цели идут в этом порядке (mirrorcheck)
+    panels = [("Мерило · сахар 100 Гц: MN9, Гц", [(name, target.left, target.right)
+                                                 for name, target in zip(names, check.sugar_targets)], 1.0)]
+    if bitter:
+        panels.append(("Горечь · зеркало Б3: MN9 напротив стимула, Гц",
+                       [("сахар 100", bitter.left.values["сахар"], bitter.right.values["сахар"]),
+                        ("сахар 100 + горечь 200", bitter.left.values["сахар + горечь"],
+                         bitter.right.values["сахар + горечь"])], 1.0))
+        panels.append(("Горечь: доля ответа MN9 на сахар, которую она убирает, %",
+                       [(name, *(None if value is None else (100 * value[0], 100 * value[1])
+                                 for value in (target.left, target.right)))
+                        for name, target in zip(names, bitter.targets)], None))
+    fig, axes = plt.subplots(1, len(panels), figsize=(4.6 * len(panels), 4.2), facecolor=SURFACE, squeeze=False)
+    width = 0.36
+    for ax, (title, groups, threshold) in zip(axes[0], panels):
+        _style(ax)
+        ax.grid(axis="x", visible=False)
+        x = np.arange(len(groups))
+        top = 0.0
+        for shift, column, color in ((-width / 2 - 0.01, 1, COLOR_LEFT), (width / 2 + 0.01, 2, COLOR_RIGHT)):
+            for xi, group in zip(x + shift, groups):
+                value = group[column]
+                mean, error = (0.0, 0.0) if value is None else (value[0], BOUNDARY_SE * value[1])
+                ax.bar(xi, mean, width=width, color=color, zorder=2)
+                if error:  # ниже нуля чёрточку не продолжаем: ни частота, ни доля отрицательными не бывают
+                    ax.errorbar(xi, mean, yerr=[[min(error, mean)], [error]], fmt="none", ecolor=INK_2, elinewidth=1,
+                                capsize=2.5, zorder=3)
+                label = "нет" if value is None else number(mean, 2 if 0 < mean < 2 else 1 if mean < 10 else 0)
+                ax.text(xi, mean + error, label, ha="center", va="bottom", fontsize=7.5, color=INK_2)
+                top = max(top, mean + error)
+        if threshold:
+            ax.axhline(threshold, color=MUTED, linewidth=1, zorder=1)
+        ax.set_xticks(x, [group[0] for group in groups], fontsize=8, color=INK_2)
+        ax.set_ylim(0, max(2.0, top * 1.18))
+        ax.set_title(title, fontsize=9, color=INK, loc="left")
+    fig.legend(handles=[Patch(color=COLOR_LEFT, label="стимулы слева"), Patch(color=COLOR_RIGHT,
+                                                                                label="стимулы справа")],
+               loc="upper right", bbox_to_anchor=(0.995, 0.995), frameon=False, fontsize=9, labelcolor=INK_2, ncols=2)
+    fig.suptitle("Раздел Е: та же картина слева и справа? Движок, 30 повторов; чёрточки — ± две погрешности; серая "
+                 "линия — порог «активного» 1 Гц", color=INK, fontsize=10, x=0.01, ha="left")
+    fig.tight_layout(rect=(0, 0, 1, 0.9))
+    fig.savefig(path, dpi=110, facecolor=SURFACE)
+    plt.close(fig)
+
+
 def _technical_lines(results: Results) -> list[str]:
     info = results.info
     reference = info["reference"]
@@ -376,6 +591,10 @@ def render_markdown(results: Results) -> str:
     for item in ITEMS:
         reference, engine = results.verdicts[item.key]
         lines.append(f"| {item.key} | {item.title} | {_mark(reference.state)} | {_mark(engine.state)} |")
+    if results.mirror:
+        words = "; ".join(f"{result.name_ru.lower()} — {MARKS[PASS if result.include else FAIL]} "
+                          f"{'включена' if result.include else 'не включена'}" for result in results.mirror.results)
+        lines.append(f"| Е | Правая сторона для горечи и усика (D-047): кнопка | — | {words} |")
     lines += [
         "",
         f"Отметки: {_mark(PASS)} · {_mark(FAIL)} · {_mark(BOUNDARY)} — число ближе к порогу, чем две погрешности, "
@@ -433,6 +652,8 @@ def render_markdown(results: Results) -> str:
                       "главный вывод статьи про воду, Д2 — воду на тех частотах, где MN9 измерял сам Shiu. "
                       "Правило каждого записано до его расчёта.", ""]
         lines += _item_section(item, results)
+    if results.mirror:
+        lines += _mirror_lines(results)
     lines += [
         "## Честность: что задано не коннектомом и что уточнено после эталона",
         "",
@@ -447,6 +668,8 @@ def render_markdown(results: Results) -> str:
         "- **[ЧЕСТНОСТЬ]** Способ перемешивания связей (Б7) — наш (D-029). Опыт с тенью (В), его группа нейронов "
         "и GF выбраны нами (D-013). Списки стимулов — из статьи, номера версии 630, не найденные в 783, не "
         "подменены (D-012).",
+        "- **[ЧЕСТНОСТЬ]** Правая сторона горечи и усика (раздел Е) — наш перенос по таблице аннотаций (D-047), "
+        "а не списки статьи.",
         "- Все стимулы — прямое включение нейронов, а не настоящий вкус, касание или тень.",
         "",
         "## Как получено",
@@ -639,7 +862,12 @@ def summary_data(results: Results) -> dict:
         items.append({"key": item.key, "title": item.title, "reference": reference.state, "engine": engine.state,
                       "added_after_reference": item.key.startswith("Д"), "words": _item_words(reference, engine)})
     passed = sum(results.agreements[condition.key].ok for condition in results.conditions)
-    return {"a": {"passed": passed, "total": len(results.conditions)}, "items": items,
+    mirror = [{"key": result.key, "name": result.name_ru, "twins": result.twins, "paired": result.paired,
+               "listed": result.listed, "include": result.include,
+               "words": f"двойников справа {result.twins} (для {result.paired} из {result.listed} нейронов левого "
+                        f"списка); кнопка «правая сторона» {mirror_decision(result)}."}
+              for result in results.mirror.results] if results.mirror else []
+    return {"a": {"passed": passed, "total": len(results.conditions)}, "items": items, "mirror": mirror,
             "marks": {state: {"mark": MARKS[state], "word": MARK_WORDS[state]} for state in MARKS}}
 
 
@@ -651,6 +879,8 @@ def write_report(results: Results) -> Path:
     figure_rates(results, FIGURES_DIR / FIGURE_RATES)
     figure_b2(results, FIGURES_DIR / FIGURE_B2)
     figure_keys(results, FIGURES_DIR / FIGURE_KEYS)
+    if results.mirror:
+        figure_mirror(results, FIGURES_DIR / FIGURE_MIRROR)
     text = render_markdown(results)
     with open(REPORT_FILE, "w", encoding="utf-8", newline="\n") as handle:
         handle.write(text)

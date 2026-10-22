@@ -6,7 +6,9 @@
    берутся оттуда, если не изменились код движка, связи и условия.
 3. Проверяет пункты А (движок против эталона, пороги D-018), Б1–Б7 (выводы статьи; одни и те же правила
    для эталона и для движка), В (тень, без порога), Д1 и Д2 (добавлены после эталона). Правила — D-031, D-032.
-4. Пишет `docs/VALIDATION.md` и картинки в `docs/validation/` (модуль `flybrain.report`).
+4. Проверяет правую сторону для горечи и усика (раздел Е, D-047; модуль `flybrain.mirrorcheck`): только движок,
+   условия — `config/mirror_check.yaml`.
+5. Пишет `docs/VALIDATION.md` и картинки в `docs/validation/` (модуль `flybrain.report`).
 """
 
 import hashlib
@@ -591,6 +593,7 @@ class Results:
     verdicts: dict[str, tuple[Verdict, Verdict]]  # пункт → (эталон, движок)
     stimulated: dict[str, np.ndarray]
     info: dict
+    mirror: object = None  # flybrain.mirrorcheck.MirrorCheck — раздел Е (D-047)
 
 
 def _connectivity_sha(conditions: list[Condition]) -> dict[str, str]:
@@ -607,6 +610,8 @@ def _connectivity_sha(conditions: list[Condition]) -> dict[str, str]:
 
 def collect(device: str = "auto", rerun: bool = False, log=print) -> Results:
     """Эталон, расчёты движка (готовые или новые) и все пункты проверки."""
+    from flybrain import mirrorcheck
+
     if not (PROCESSED_DIR / processed.BUILD_INFO_FILE).exists():
         raise ValidateError("нет подготовленных данных. Выполните: uv run flybrain fetch-data, "
                             "затем uv run flybrain build-data")
@@ -634,13 +639,19 @@ def collect(device: str = "auto", rerun: bool = False, log=print) -> Results:
         stimulated[condition.key] = stimulated_of(condition, groups)
     log(f"[OK] эталон: {len(conditions)} условий по {n_trials} повторов, настройки совпадают с нынешними")
 
+    # Правая сторона (D-047): только основной расчёт движка, эталона нет.
+    mirror_conditions = mirrorcheck.load_mirror_conditions()
+    for condition in mirror_conditions:
+        stimulated[condition.key] = stimulated_of(condition, groups)
+
     version = engine_version()
     engine_runs: dict[str, dict[str, Run]] = {run: {} for run in RUNS}
     csr_cache: dict[str, dict] = {}
     todo = []
-    for condition in conditions:
+    plan = [(condition, RUNS) for condition in conditions] + [(condition, ("main",)) for condition in mirror_conditions]
+    for condition, runs in plan:
         stimuli = stimuli_of(condition, groups)
-        for run in RUNS:
+        for run in runs:
             meta = result_meta(condition, run, stimuli, n_trials, duration_ms, shas[condition.connectivity], keys,
                                version)
             path = VALIDATION_DIR / f"{condition.key}.{run}.npz"
@@ -649,8 +660,10 @@ def collect(device: str = "auto", rerun: bool = False, log=print) -> Results:
                 todo.append((condition, run, stimuli, meta, path))
             else:
                 engine_runs[run][condition.key] = saved
-    log(f"Движок: расчётов {2 * len(conditions)} (по 2 на условие: основной и «шумовой предел»), "
-        f"готовых {2 * len(conditions) - len(todo)}, считать {len(todo)}")
+    total_runs = 2 * len(conditions) + len(mirror_conditions)
+    log(f"Движок: расчётов {total_runs} (по 2 на условие эталона: основной и «шумовой предел»; по одному на "
+        f"{len(mirror_conditions)} условия правой стороны, D-047), готовых {total_runs - len(todo)}, "
+        f"считать {len(todo)}")
     device_used = None
     started = time.monotonic()
     for number_done, (condition, run, stimuli, meta, path) in enumerate(todo, start=1):
@@ -685,8 +698,10 @@ def collect(device: str = "auto", rerun: bool = False, log=print) -> Results:
     info = {"n_trials": n_trials, "duration_ms": duration_ms, "engine_version": version,
             "device": device_used or _saved_device(conditions), "reference": reference_info,
             "connectivity_sha256": shas}
-    return Results(conditions, keys, reference, engine_runs["main"], engine_runs["repeat"], agreements, noise,
-                   verdicts, stimulated, info)
+    wiring = mirrorcheck.Wiring(csr_cache.get("original") or processed.load_connectivity())
+    mirror = mirrorcheck.collect(groups, neurons, keys, engine_runs["main"], stimulated, wiring, mirror_conditions)
+    return Results(conditions, keys, reference, {key: engine_runs["main"][key] for key in reference},
+                   engine_runs["repeat"], agreements, noise, verdicts, stimulated, info, mirror)
 
 
 def _device_label(device: str) -> str:
@@ -714,7 +729,7 @@ MARK_WORDS = {PASS: "да", FAIL: "нет", BOUNDARY: "на границе", INF
 
 
 def run_validate(device: str = "auto", rerun: bool = False) -> int:
-    from flybrain.report import REPORT_FILE, write_report
+    from flybrain.report import REPORT_FILE, mirror_decision, write_report
 
     started = time.monotonic()
     print("FlyBrain: проверка движка против эталона Brian2 и выводов статьи (C6)\n")
@@ -740,6 +755,13 @@ def run_validate(device: str = "auto", rerun: bool = False) -> int:
         reference, engine = results.verdicts[item.key]
         print(f"  {item.key:<3} {MARKS[reference.state]} {MARK_WORDS[reference.state]:<11} / "
               f"{MARKS[engine.state]} {MARK_WORDS[engine.state]:<11} {item.title}")
+    print(f"\nЕ. Правая сторона для горечи и усика (D-047; расхождение сахара слева/справа — "
+          f"{number(results.mirror.sugar_discrepancy, 2)}):")
+    for result in results.mirror.results:
+        gap = "" if result.discrepancy is None else f", расхождение {number(result.discrepancy, 2)}"
+        print(f"  {MARKS[PASS if result.include else FAIL]} {result.name_ru}: двойников {result.twins} "
+              f"(для {result.paired} из {result.listed} нейронов левого списка){gap}; "
+              f"кнопка «правая сторона» {mirror_decision(result)}")
     print(f"\nОтчёт: {REPORT_FILE.relative_to(PROJECT_ROOT).as_posix()} (картинки — docs/validation/). "
           f"Готово за {number((time.monotonic() - started) / 60)} мин.")
     return 0

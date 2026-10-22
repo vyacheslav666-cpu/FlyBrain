@@ -78,7 +78,8 @@ export function createStimulusPanel(catalog, onCommand) {
     const lockNote = element("p", "stim-note");
     if (button.side_locked) {
       const only = button.sides[0].side === "left" ? "левой" : "правой";
-      lockNote.textContent = `Сторона не выбирается: в статье список только для ${only} стороны мухи.`;
+      lockNote.textContent = button.side_lock_short_ru ||
+        `Сторона не выбирается: в статье список только для ${only} стороны мухи.`;
     }
     const info = element("div", "stim-info");
     info.hidden = true;

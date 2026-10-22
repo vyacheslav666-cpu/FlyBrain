@@ -10,6 +10,7 @@ import numpy as np
 import pandas as pd
 import yaml
 
+from flybrain.mirror import TypeMatch, match_twins, twins_of
 from flybrain.paths import CONFIG_DIR
 
 GROUPS_CONFIG = CONFIG_DIR / "neuron_groups.yaml"
@@ -35,11 +36,13 @@ class Group:
     name_ru: str
     about_ru: str
     honesty_ru: str | None
-    source: str  # "paper", "select" или "union"
+    source: str  # "paper", "select", "union" или "mirror"
     paper: str | None  # где список записан у Shiu, например «figures.ipynb: neu_sugar»
     indices: np.ndarray  # внутренние номера нейронов группы, по возрастанию
     paper_total: int = 0
     paper_missing: list[int] = field(default_factory=list)
+    mirror_of: str | None = None  # для source == "mirror": чьи это правые двойники (D-047)
+    mirror: list[TypeMatch] = field(default_factory=list)
 
 
 def load_group_config(path: Path = GROUPS_CONFIG) -> dict:
@@ -144,21 +147,21 @@ def resolve_groups(config: dict, neurons: pd.DataFrame, paper_lists: dict) -> di
     for section in SECTIONS:
         resolved[section] = {}
         specs = config.get(section) or {}
-        unions = []
+        unions, mirrors = [], []
         for key, spec in specs.items():
             where = f"{section}.{key}"
-            ways = [way for way in ("paper_ids", "select", "union") if way in spec]
-            if not ways or "union" in ways and len(ways) > 1:
-                raise GroupError(f"{where}: состав задаётся одним из paper_ids, select или union")
+            ways = [way for way in ("paper_ids", "select", "union", "mirror_of") if way in spec]
+            if not ways or ("union" in ways or "mirror_of" in ways) and len(ways) > 1:
+                raise GroupError(f"{where}: состав задаётся одним из paper_ids, select, union или mirror_of")
             if "paper" not in spec and not spec.get("honesty_ru"):
                 raise GroupError(f"{where}: группа не из статьи должна иметь пояснение honesty_ru")
             group = Group(
                 key=key, section=section, name_ru=spec["name_ru"], about_ru=spec["about_ru"],
                 honesty_ru=spec.get("honesty_ru"), source="", paper=None, indices=np.array([], dtype=np.int64),
             )
-            if "union" in spec:
-                group.source = "union"
-                unions.append((group, spec["union"]))
+            if "union" in spec or "mirror_of" in spec:
+                group.source = "union" if "union" in spec else "mirror"
+                (unions if "union" in spec else mirrors).append((group, spec.get("union") or spec["mirror_of"]))
                 resolved[section][key] = group
                 continue
             found: list[int] = []
@@ -193,6 +196,15 @@ def resolve_groups(config: dict, neurons: pd.DataFrame, paper_lists: dict) -> di
                 group.paper_total += other.paper_total
                 group.paper_missing += other.paper_missing
             group.indices = np.array(sorted(members), dtype=np.int64)
+        for group, of in mirrors:
+            # Двойники бывают только у списка статьи (или объединения списков) — правило D-047.
+            where = f"{section}.{group.key}"
+            left = resolved[section].get(of)
+            if left is None or left.source not in ("paper", "union") or not left.paper_total:
+                raise GroupError(f"{where}: двойников ищем только для списка статьи, а «{of}» не такой")
+            group.mirror_of = of
+            group.mirror = match_twins(left.indices, neurons)
+            group.indices = twins_of(group.mirror)  # может быть пусто: тогда двойников нет (D-047)
     return resolved
 
 
@@ -211,6 +223,8 @@ def groups_to_json(groups: dict[str, dict[str, Group]], neurons: pd.DataFrame) -
                 "count": int(len(group.indices)),
                 "paper_total": group.paper_total,
                 "paper_missing_root_ids": [str(i) for i in group.paper_missing],
+                **({"mirror_of": group.mirror_of, "mirror_types": [match.to_json() for match in group.mirror]}
+                   if group.source == "mirror" else {}),
                 "indices": group.indices.tolist(),
                 "root_ids": [str(i) for i in root_ids[group.indices]],
             }

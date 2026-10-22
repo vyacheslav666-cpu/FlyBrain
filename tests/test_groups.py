@@ -6,7 +6,7 @@ import pandas as pd
 import pytest
 import yaml
 
-from flybrain.groups import SECTIONS, STATUSES, GroupError, load_group_config, read_data_pickle, \
+from flybrain.groups import SECTIONS, STATUSES, GroupError, groups_to_json, load_group_config, read_data_pickle, \
     read_notebook_lists, resolve_groups
 from flybrain.paths import CONFIG_DIR
 
@@ -75,6 +75,42 @@ def test_select_must_contain_paper_ids_and_union_merges():
     assert groups["MN9"].indices.tolist() == [2]
     assert groups["left_sensory"].indices.tolist() == [0, 1]
     assert groups["both"].indices.tolist() == [0, 1, 2]
+
+
+def test_mirror_group_takes_right_twins_of_a_paper_list():
+    neurons = pd.DataFrame({
+        "root_id": [A, B, C, D],
+        "cell_type": ["LB1a", "LB1a", "LB1a", "LB1a"],
+        "side": ["left", "left", "right", "right"],
+        "super_class": ["sensory"] * 4, "cell_class": [None] * 4, "cell_sub_class": [None] * 4,
+    })
+    config = _config([{"id": A, "status": "in_783"}, {"id": B, "status": "in_783"}])
+    config["stimuli"]["sugar_right"] = {"name_ru": "т", "about_ru": "т", "honesty_ru": "наш перенос (D-047)",
+                                        "mirror_of": "sugar"}
+    groups = resolve_groups(config, neurons, _paper(neu_sugar=[A, B]))
+    right = groups["stimuli"]["sugar_right"]
+    assert right.source == "mirror" and right.mirror_of == "sugar" and right.indices.tolist() == [2, 3]
+    entry = groups_to_json(groups, neurons)["stimuli"]["sugar_right"]
+    assert entry["mirror_of"] == "sugar" and entry["mirror_types"][0]["twins"] == [2, 3]
+    assert "mirror_types" not in groups_to_json(groups, neurons)["stimuli"]["sugar"]
+
+    # Левый список берёт только часть типа: двойников нет, группа пуста, но это не ошибка (D-047).
+    config["stimuli"]["sugar"]["paper_ids"] = [{"id": A, "status": "in_783"}]
+    groups = resolve_groups(config, neurons, _paper(neu_sugar=[A]))
+    assert groups["stimuli"]["sugar_right"].indices.tolist() == []
+    assert groups["stimuli"]["sugar_right"].mirror[0].reason == "part_of_type"
+
+
+def test_mirror_only_of_a_paper_list_and_never_mixed_with_other_ways():
+    config = {"stimuli": {
+        "own": {"name_ru": "т", "about_ru": "т", "honesty_ru": "наш выбор", "select": {"cell_type": "LB3c"}},
+        "own_right": {"name_ru": "т", "about_ru": "т", "honesty_ru": "наш перенос", "mirror_of": "own"},
+    }}
+    with pytest.raises(GroupError, match="только для списка статьи"):
+        resolve_groups(config, _neurons(), {})
+    config["stimuli"]["own_right"]["select"] = {"cell_type": "LB3c"}
+    with pytest.raises(GroupError, match="одним из"):
+        resolve_groups(config, _neurons(), {})
 
 
 def test_group_not_from_paper_needs_honesty_note():

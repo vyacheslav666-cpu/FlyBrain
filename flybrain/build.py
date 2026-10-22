@@ -164,7 +164,12 @@ def _sides(neurons: pd.DataFrame, group: Group, names: dict) -> str:
 
 def _print_group(neurons: pd.DataFrame, group: Group, names: dict) -> None:
     count = len(group.indices)
-    if group.source == "select" and not group.paper:
+    if group.source == "mirror":
+        paired = sum(len(match.listed) for match in group.mirror if match.twins)
+        listed = sum(len(match.listed) for match in group.mirror)
+        origin = (f"правые двойники по таблице аннотаций для {paired} из {listed} нейронов «{group.mirror_of}» "
+                  "(правило D-047) [ЧЕСТНОСТЬ]")
+    elif group.source == "select" and not group.paper:
         origin = "наш отбор по таблице аннотаций [ЧЕСТНОСТЬ]"
     elif group.paper_total:
         missing = len(group.paper_missing)
@@ -173,7 +178,8 @@ def _print_group(neurons: pd.DataFrame, group: Group, names: dict) -> None:
             origin += f" (не найден в 783: {missing})"
     else:
         origin = "наш отбор"
-    print(f"    {group.name_ru}: {_fmt(count)} — {origin}; сторона мухи: {_sides(neurons, group, names)}")
+    sides = _sides(neurons, group, names) or "—"
+    print(f"    {group.name_ru}: {_fmt(count)} — {origin}; сторона мухи: {sides}")
 
 
 def run_build_data() -> int:

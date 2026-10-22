@@ -58,6 +58,12 @@ function renderValidation(target, summary) {
     line.append(element("b", "", `${item.key}, эксперимент вне статьи: `), item.words);
     list.append(line);
   }
+  // Правая сторона горечи и усика (D-047): двойники по таблице аннотаций, не списки статьи.
+  for (const item of summary.mirror ?? []) {
+    const line = element("li");
+    line.append(element("b", "", `Е, ${item.name.toLowerCase()} справа [ЧЕСТНОСТЬ]: `), item.words);
+    list.append(line);
+  }
   target.append(list);
   target.append(element("p", "about-muted",
     "✅ да · ❌ нет · ⚠️ на границе: число ближе к порогу, чем две погрешности, и не засчитывается. " +

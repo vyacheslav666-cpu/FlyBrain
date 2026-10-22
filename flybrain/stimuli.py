@@ -24,11 +24,31 @@ def load_buttons(path=PANEL_CONFIG) -> list[dict]:
         return yaml.safe_load(handle)["buttons"]
 
 
+def _mirror_origin(group: dict) -> str:
+    """Откуда правые двойники (D-047): для скольких нейронов левого списка нашлись и почему не для остальных."""
+    found = [match for match in group["mirror_types"] if match["twins"]]
+    lost = [match for match in group["mirror_types"] if not match["twins"]]
+    paired = sum(len(match["listed"]) for match in found)
+    listed = sum(len(match["listed"]) for match in group["mirror_types"])
+    types = ", ".join(f"{match['cell_type']} ({len(match['listed'])} слева — {len(match['twins'])} справа)"
+                      for match in found)
+    text = (f"Это не список статьи [ЧЕСТНОСТЬ]: правые двойники нейронов левого списка статьи, найденные по таблице "
+            f"аннотаций FlyWire 783 (тип клетки + сторона, правило D-047). Двойники нашлись для {paired} из {listed} "
+            f"нейронов левого списка: {types}.")
+    if lost:
+        text += " Без двойника: " + "; ".join(
+            f"{match['cell_type']} — {len(match['listed'])} (слева в списке {len(match['listed'])} из "
+            f"{match['left_total']}, справа {match['right_total']})" for match in lost) + "."
+    return text
+
+
 def _side_info(group: dict) -> list[str]:
     """Честное описание группы для кнопки «ⓘ»: что включается, сколько, откуда список."""
     missing = len(group["paper_missing_root_ids"])
     lost = f"; остальные ({missing}) в 783 не найдены и не заменены «похожими»" if missing else ""
-    if group["paper"]:
+    if group.get("mirror_of"):
+        origin = _mirror_origin(group)
+    elif group["paper"]:
         file, name = group["paper"].split(": ")
         origin = (f"Список взят из статьи Shiu et al. 2024: {file}, список «{name}» — {group['paper_total']} "
                   f"нейронов, в версии данных 783 найдено {group['count']}{lost}.")
@@ -61,6 +81,9 @@ def build_catalog(groups: dict, buttons: list[dict]) -> tuple[dict, dict[str, di
         missing = [key for key in sides.values() if key not in stimuli]
         if missing:
             raise StimulusError(f"кнопка «{button['key']}»: нет групп {missing} в groups.json")
+        empty = [key for key in sides.values() if not stimuli[key]["count"]]
+        if empty:  # например, правые двойники, которых не нашлось (D-047)
+            raise StimulusError(f"кнопка «{button['key']}»: в группах {empty} нет ни одного нейрона")
         indices[button["key"]] = {side: np.asarray(stimuli[key]["indices"], dtype=np.int64)
                                   for side, key in sides.items()}
         locked = len(sides) == 1
@@ -75,6 +98,7 @@ def build_catalog(groups: dict, buttons: list[dict]) -> tuple[dict, dict[str, di
             "default_side": DEFAULT_SIDE,
             "side_locked": locked,
             "side_note_ru": (button.get("side_lock_ru") or button.get("side_note_ru") or "").strip(),
+            "side_lock_short_ru": (button.get("side_lock_short_ru") or "").strip(),
             "sides": [
                 {"side": side, "label": SIDE_NAMES[side], "group": key, "count": stimuli[key]["count"],
                  "info": _side_info(stimuli[key])}

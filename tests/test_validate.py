@@ -155,9 +155,9 @@ def test_summary_for_about_window_uses_report_marks():
     verdicts = {item.key: (ok, ok) for item in ITEMS}
     verdicts.update({"Б4": (bad, bad), "Б6": (edge, ok), "В": (shadow, shadow)})
     results = SimpleNamespace(verdicts=verdicts, conditions=[SimpleNamespace(key="a"), SimpleNamespace(key="b")],
-                              agreements={"a": SimpleNamespace(ok=True), "b": SimpleNamespace(ok=False)})
+                              agreements={"a": SimpleNamespace(ok=True), "b": SimpleNamespace(ok=False)}, mirror=None)
     data = summary_data(results)
-    assert data["a"] == {"passed": 1, "total": 2}
+    assert data["a"] == {"passed": 1, "total": 2} and data["mirror"] == []
     assert [item["key"] for item in data["items"]] == [item.key for item in ITEMS]
     items = {item["key"]: item for item in data["items"]}
     assert items["Б1"]["words"] == "Повторился и в эталоне Brian2, и в движке."
