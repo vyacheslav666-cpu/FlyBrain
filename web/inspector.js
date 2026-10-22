@@ -119,7 +119,7 @@ export function createCard(root, { onClose, onSelect }) {
   close.addEventListener("click", onClose);
   bar.append(title, collapse, close);
   const body = element("div", "card-body");
-  const grip = element("div", "card-grip");
+  const grip = element("div", "card-grip corner-grip grip-br");
   grip.title = "Потяните, чтобы изменить размер карточки";
   root.replaceChildren(bar, body, grip);
   const floating = makeFloating(root, { bar, grip, collapseButton: collapse });

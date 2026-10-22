@@ -158,7 +158,7 @@ html, body {
 #tooltip { z-index: 5; max-width: 340px; padding: 10px 12px; pointer-events: none; }
 #card {
   top: 70px;
-  right: 380px; /* левее панели «исполнителей» (340 px + 20 px от края + зазор) */
+  right: calc(var(--executors-width, 340px) + 40px); /* левее панели «исполнителей» (её ширина + 20 px от края + зазор) */
   width: 340px;
   max-height: calc(100vh - 70px - var(--bottom-gap) - 12px); /* сверху 70 px, снизу подсказка и зазор */
   z-index: 4; /* карточку можно унести на другую панель — она должна быть сверху */
@@ -178,24 +178,10 @@ html, body {
 #card.collapsed { height: auto !important; }
 #card.collapsed .card-body, #card.collapsed .card-grip { display: none; }
 #card.collapsed .card-bar { padding-bottom: 8px; }
-.card-grip {
-  position: absolute;
-  right: 0;
-  bottom: 0;
-  width: 18px;
-  height: 18px;
-  cursor: nwse-resize;
-  touch-action: none;
-  background: linear-gradient(135deg, transparent 50%, rgba(255, 255, 255, 0.28) 50%, rgba(255, 255, 255, 0.28) 58%,
-    transparent 58%, transparent 70%, rgba(255, 255, 255, 0.28) 70%, rgba(255, 255, 255, 0.28) 78%, transparent 78%);
-  border-bottom-right-radius: 10px;
-}
-.card-grip:hover, body.card-sizing .card-grip {
-  background: linear-gradient(135deg, transparent 50%, #5ff0ff 50%, #5ff0ff 58%, transparent 58%, transparent 70%, #5ff0ff 70%,
-    #5ff0ff 78%, transparent 78%);
-}
+.card-grip { border-bottom-right-radius: 10px; }
 body.card-moving, body.card-moving * { cursor: move !important; user-select: none; }
 body.card-sizing, body.card-sizing * { cursor: nwse-resize !important; user-select: none; }
+body.card-sizing .card-grip { --grip: #5ff0ff; }
 .neuron-head { display: flex; flex-direction: column; gap: 2px; margin-bottom: 8px; padding-right: 18px; }
 .neuron-label { font-size: 16px; }
 .neuron-about { color: var(--muted); font-size: 12px; }
@@ -506,23 +492,52 @@ span.partner-label { color: var(--muted); }
 #view #legend:not([hidden]) { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; }
 #view #legend ul { flex: 0 1 auto; min-height: 0; }
 #view.sized #legend ul { flex-grow: 1; max-height: none; }
-.resize-handle { position: absolute; left: 14px; right: 14px; z-index: 1; height: 12px; cursor: ns-resize; touch-action: none; }
-.resize-bottom { bottom: -6px; }
-.resize-top { top: -6px; }
-.resize-handle::after {
-  content: "";
+/* Уголок размера (D-042): две косые полоски в углу, как у карточки нейрона. */
+.corner-grip {
+  --grip: rgba(255, 255, 255, 0.28);
+  --grip-angle: 135deg;
   position: absolute;
-  left: 50%;
-  top: 50%;
-  width: 40px;
-  height: 4px;
-  transform: translate(-50%, -50%);
-  border-radius: 2px;
-  background: rgba(255, 255, 255, 0.22);
-  transition: background 0.15s, width 0.15s;
+  z-index: 2;
+  width: 18px;
+  height: 18px;
+  touch-action: none;
+  background: linear-gradient(var(--grip-angle), transparent 50%, var(--grip) 50%, var(--grip) 58%, transparent 58%,
+    transparent 70%, var(--grip) 70%, var(--grip) 78%, transparent 78%);
 }
-.resize-handle:hover::after, .resize-handle.active::after { width: 64px; background: #5ff0ff; }
-body.resizing, body.resizing * { cursor: ns-resize !important; user-select: none; }
+.corner-grip:hover, .corner-grip.active { --grip: #5ff0ff; }
+.grip-br { right: 0; bottom: 0; --grip-angle: 135deg; cursor: nwse-resize; border-bottom-right-radius: 10px; }
+.grip-bl { left: 0; bottom: 0; --grip-angle: 225deg; cursor: nesw-resize; border-bottom-left-radius: 10px; }
+.grip-tr { right: 0; top: 0; --grip-angle: 45deg; cursor: nesw-resize; border-top-right-radius: 10px; }
+.grip-tl { left: 0; top: 0; --grip-angle: 315deg; cursor: nwse-resize; border-top-left-radius: 10px; }
+body.sizing-nwse, body.sizing-nwse * { cursor: nwse-resize !important; user-select: none; }
+body.sizing-nesw, body.sizing-nesw * { cursor: nesw-resize !important; user-select: none; }
+/* Кнопка «−» в правом верхнем углу сворачивает панель до заголовка. Она стоит левее полосы прокрутки,
+   а у «Вида» — ещё и левее уголка размера. */
+.panel-collapse {
+  position: absolute;
+  top: 6px;
+  right: 18px;
+  z-index: 3;
+  width: 22px;
+  height: 22px;
+  padding: 0 !important;
+  border: 0 !important;
+  border-radius: 6px;
+  background: transparent !important;
+  color: var(--muted) !important;
+  font: inherit;
+  font-size: 18px !important;
+  line-height: 1;
+  cursor: pointer;
+}
+.panel-collapse:hover { color: var(--text) !important; background: rgba(255, 255, 255, 0.08) !important; }
+#view .panel-collapse { right: 24px; }
+#view #compass { margin-right: 26px; }
+.panel-collapsed-title { display: none; padding: 9px 40px 9px 14px; font-size: 13px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: 0.06em; }
+.resizable.collapsed { height: auto !important; }
+.resizable.collapsed .panel-body, .resizable.collapsed .corner-grip { display: none !important; } /* у «Вида» обёртка — flex с id в правиле */
+.resizable.collapsed .panel-collapsed-title { display: block; }
+#view.collapsed .panel-collapse { right: 8px; }
 
 /* Кнопка «Скрыть панели» (H): на узком окне панели не оставляют места облаку, поэтому там они сначала скрыты.
    Компас остаётся в углу: он нужен именно тогда, когда смотришь на мозг без панелей. */
@@ -548,7 +563,10 @@ body.panels-hidden #live,
 body.panels-hidden #view .view-main,
 body.panels-hidden #view .view-slider,
 body.panels-hidden #view #legend,
-body.panels-hidden .resize-handle { display: none; }
+body.panels-hidden .resizable .corner-grip,
+body.panels-hidden .panel-collapse,
+body.panels-hidden .resizable .panel-collapsed-title { display: none; }
+body.panels-hidden #view.collapsed .panel-body { display: flex !important; } /* компас остаётся и у свёрнутого «Вида» */
 body.panels-hidden #view { background: none; border: 0; backdrop-filter: none; width: auto; height: auto !important; max-height: none; }
 body.panels-hidden #view .panel-body { padding: 0; overflow: visible; }
 @media (max-width: 760px) {
