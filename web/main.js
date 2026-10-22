@@ -482,6 +482,7 @@ function start({ meta, stimuli, executors, positions, classes }) {
   const framingPanels = ["stimuli", "view", "executors", "live", "card"].map((id) => document.getElementById(id));
   const searchBox = document.getElementById("search");
   const helpBox = document.getElementById("help");
+  const compassBox = document.getElementById("compass");
 
   function flyToNeurons(indices) {
     const sum = [0, 0, 0];
@@ -492,7 +493,7 @@ function start({ meta, stimuli, executors, positions, classes }) {
     const rects = framingPanels.filter((panel) => panel.getClientRects().length > 0)
       .map((panel) => panel.getBoundingClientRect());
     const area = freeArea(rects, window.innerWidth, window.innerHeight,
-      searchBox.getBoundingClientRect().bottom, helpBox.getBoundingClientRect().top);
+      searchBox.getBoundingClientRect().bottom, compassBox.getBoundingClientRect().top); // компас стоит над подсказкой
     const axes = { right: new THREE.Vector3(1, 0, 0), up: new THREE.Vector3(0, 1, 0), back: new THREE.Vector3(0, 0, 1) };
     for (const axis of Object.values(axes)) axis.applyQuaternion(camera.quaternion);
     const basis = Object.fromEntries(Object.entries(axes).map(([name, axis]) => [name, axis.toArray()]));

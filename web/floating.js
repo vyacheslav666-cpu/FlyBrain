@@ -1,4 +1,5 @@
-// Плавающие окошки: карточка нейрона (D-041) и все панели (D-043). Окошко двигают за заголовок,
+// Плавающие окошки: карточка нейрона (D-041) и все панели (D-043). Окошко двигают за полосу с точками
+// у левого края (D-044) или за заголовок,
 // размер меняют за уголок справа внизу, кнопка «−» сворачивает его до заголовка.
 // Двойной щелчок по заголовку возвращает обычное место и размер, по уголку — обычный размер.
 // Пока окошко не трогали, оно стоит там, где его ставит style.css; первое касание закрепляет его левым верхним углом.
@@ -41,6 +42,11 @@ function raise(root) {
  */
 export function makeFloating(root, { handles, grip, collapseButton, state, save, noun, minWidth, minHeight }) {
   const has = (key) => Number.isFinite(state[key]);
+  // Полоса с точками вдоль левого края — за неё окошко двигают (как за заголовок).
+  const strip = document.createElement("div");
+  strip.className = "move-strip";
+  strip.title = `Потяните, чтобы передвинуть ${noun}. Двойной щелчок — обычное место и размер`;
+  root.append(strip);
 
   // Если окно браузера стало меньше, окошко подвигается и сужается только на экране, а запомненное не меняется:
   // окно снова станет большим — окошко вернётся туда, где было.
@@ -103,7 +109,7 @@ export function makeFloating(root, { handles, grip, collapseButton, state, save,
     handle.addEventListener("pointercancel", finish);
   }
 
-  for (const handle of handles) {
+  for (const handle of [strip, ...handles]) {
     handle.classList.add("drag-handle");
     track(handle, "moving", (dx, dy, start) => {
       state.left = start.left + dx;

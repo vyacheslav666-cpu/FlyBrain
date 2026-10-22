@@ -169,9 +169,9 @@ html, body {
 }
 #card[hidden] { display: none; }
 /* Заголовок, за который карточку двигают, и уголок для размера (D-041). */
-.card-bar { display: flex; align-items: center; gap: 4px; padding: 8px 6px 4px 14px; cursor: move; user-select: none; touch-action: none; }
+.card-bar { display: flex; align-items: center; gap: 4px; padding: 8px 6px 4px 20px; cursor: move; user-select: none; touch-action: none; }
 .card-title { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 16px; }
-.card-body { flex: 1 1 auto; min-height: 0; overflow-y: auto; padding: 0 14px 12px; color-scheme: dark; }
+.card-body { flex: 1 1 auto; min-height: 0; overflow-y: auto; margin-bottom: 18px; padding: 0 14px 0 20px; color-scheme: dark; }
 #card .neuron-head { padding-right: 0; }
 #card .neuron-label { display: none; } /* имя уже в заголовке */
 #card .neuron-head:not(:has(.neuron-about)) { display: none; }
@@ -442,7 +442,8 @@ span.partner-label { color: var(--muted); }
 #view button[aria-pressed="true"] { background: rgba(95, 240, 255, 0.18); border-color: #5ff0ff; }
 #view .view-wide { width: 100%; }
 #view button[aria-disabled="true"] { opacity: 0.45; cursor: help; }
-#compass { flex: none; margin-top: 2px; }
+/* Компас — внизу посередине, над подсказкой (D-044). Подсказка «только активные» и сообщения стоят над ним. */
+#compass { position: fixed; left: 50%; bottom: calc(var(--bottom-gap) + 2px); z-index: 1; transform: translateX(-50%); }
 .view-slider { display: grid; grid-template-columns: 62px 1fr 44px; align-items: center; gap: 8px; margin-top: 8px; color: var(--muted); font-size: 12px; }
 .view-slider input { width: 100%; margin: 0; accent-color: #5ff0ff; }
 .view-slider output { color: var(--text); text-align: right; font-variant-numeric: tabular-nums; }
@@ -461,8 +462,8 @@ span.partner-label { color: var(--muted); }
   text-align: center;
   pointer-events: none;
 }
-#active-hint { bottom: calc(var(--bottom-gap) + 24px); color: var(--muted); }
-#toast { bottom: calc(var(--bottom-gap) + 68px); border-color: rgba(95, 240, 255, 0.5); }
+#active-hint { bottom: calc(var(--bottom-gap) + 100px); color: var(--muted); }
+#toast { bottom: calc(var(--bottom-gap) + 144px); border-color: rgba(95, 240, 255, 0.5); }
 #active-hint[hidden], #toast[hidden], #fps[hidden] { display: none; }
 
 #fps {
@@ -482,7 +483,9 @@ span.partner-label { color: var(--muted); }
 /* Панель не прокручивается сама: прокручивается обёртка внутри (resize.js), а ручка стоит на краю панели. */
 .resizable { display: flex; flex-direction: column; }
 .resizable[hidden] { display: none; }
-.panel-body { flex: 1 1 auto; min-height: 0; overflow-y: auto; padding: 12px 14px; color-scheme: dark; }
+/* Снизу у обёртки — полоса 18 px (высота уголка) без содержимого: там стоит уголок размера, и полоса прокрутки со стрелкой «вниз»
+   кончается над ним, а не под ним (D-044). Слева — место под полосу перетаскивания. */
+.panel-body { flex: 1 1 auto; min-height: 0; overflow-y: auto; margin-bottom: 18px; padding: 12px 14px 0 20px; color-scheme: dark; }
 /* В «Виде» лишняя высота достаётся списку легенды. */
 #view .panel-body { display: flex; flex-direction: column; }
 #view #legend:not([hidden]) { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; }
@@ -500,6 +503,24 @@ span.partner-label { color: var(--muted); }
     transparent 70%, var(--grip) 70%, var(--grip) 78%, transparent 78%);
 }
 .corner-grip:hover, .corner-grip.active { --grip: #5ff0ff; }
+/* Полоса перетаскивания у левого края (D-044): столбик точек, при наведении — голубой. */
+.move-strip {
+  --dots: rgba(255, 255, 255, 0.26);
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  z-index: 2;
+  width: 14px;
+  border-radius: 10px 0 0 10px;
+  /* два столбика точек через 6 px */
+  background-image: radial-gradient(circle, var(--dots) 1.2px, transparent 1.6px),
+    radial-gradient(circle, var(--dots) 1.2px, transparent 1.6px);
+  background-size: 4px 6px;
+  background-position: 3px 8px, 7px 8px;
+  background-repeat: repeat-y;
+}
+.move-strip:hover, .move-strip.active { --dots: #5ff0ff; background-color: rgba(95, 240, 255, 0.07); }
 .grip-br { right: 0; bottom: 0; cursor: nwse-resize; border-bottom-right-radius: 10px; }
 /* Заголовок, за который окошко двигают (D-043), и курсор, пока тянут. */
 .drag-handle { cursor: move; user-select: none; touch-action: none; }
@@ -529,14 +550,13 @@ body.sizing, body.sizing * { cursor: nwse-resize !important; user-select: none; 
   cursor: pointer;
 }
 .panel-collapse:hover { color: var(--text) !important; background: rgba(255, 255, 255, 0.08) !important; }
-#view #compass { margin-right: 26px; }
-.panel-collapsed-title { display: none; padding: 9px 40px 9px 14px; font-size: 13px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: 0.06em; }
+.panel-collapsed-title { display: none; padding: 9px 40px 9px 20px; font-size: 13px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: 0.06em; }
 .resizable.collapsed { height: auto !important; }
 .resizable.collapsed .panel-body, .resizable.collapsed .corner-grip { display: none !important; } /* у «Вида» обёртка — flex с id в правиле */
 .resizable.collapsed .panel-collapsed-title { display: block; }
 
 /* Кнопка «Скрыть панели» (H): на узком окне панели не оставляют места облаку, поэтому там они сначала скрыты.
-   Компас остаётся в углу: он нужен именно тогда, когда смотришь на мозг без панелей. */
+   Компас внизу посередине остаётся: он нужен именно тогда, когда смотришь на мозг без панелей. */
 #panels-toggle {
   position: fixed;
   top: 14px;
@@ -556,15 +576,7 @@ body.sizing, body.sizing * { cursor: nwse-resize !important; user-select: none; 
 body.panels-hidden #stimuli,
 body.panels-hidden #executors,
 body.panels-hidden #live,
-body.panels-hidden #view .view-main,
-body.panels-hidden #view .view-slider,
-body.panels-hidden #view #legend,
-body.panels-hidden .resizable .corner-grip,
-body.panels-hidden .panel-collapse,
-body.panels-hidden .resizable .panel-collapsed-title { display: none; }
-body.panels-hidden #view.collapsed .panel-body { display: flex !important; } /* компас остаётся и у свёрнутого «Вида» */
-body.panels-hidden #view { background: none; border: 0; backdrop-filter: none; width: auto !important; height: auto !important; max-height: none !important; }
-body.panels-hidden #view .panel-body { padding: 0; overflow: visible; }
+body.panels-hidden #view { display: none; }
 @media (max-width: 760px) {
   #search { width: min(420px, calc(100vw - 290px)); } /* между названием слева и кнопкой «Скрыть панели» справа */
   #stimuli, #executors, #view { width: calc(50vw - 30px); }
@@ -572,9 +584,6 @@ body.panels-hidden #view .panel-body { padding: 0; overflow: visible; }
   .view-row button { padding: 5px 4px; font-size: 12px; }
 }
 @media (max-width: 520px) {
-  /* Панель уже 210 px: компас не помещается справа от кнопок и стоит над ними */
-  .view-top { flex-direction: column-reverse; align-items: stretch; }
-  #compass { align-self: flex-end; margin: 0 0 -4px; }
   .view-slider { grid-template-columns: 56px 1fr 40px; gap: 6px; }
 }
 

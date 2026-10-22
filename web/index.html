@@ -88,9 +88,6 @@
           <button type="button" id="view-shot" title="Сохраняет картинку (PNG) в папку «Загрузки»">📷 Снимок</button>
         </div>
       </div>
-      <canvas id="compass" width="112" height="92" role="img"
-              aria-label="компас: куда в мозге перед, лево и верх мухи"
-              title="Оси мухи: перед, лево (левая сторона мухи), верх. Поворачиваются вместе с мозгом."></canvas>
     </div>
     <label class="view-slider" title="Яркость облака, контура и свечения. Меняется только показ, модель не меняется"><span>Яркость</span>
       <input id="view-brightness" type="range" min="0" max="100" step="1" value="50">
@@ -104,6 +101,10 @@
       <p id="legend-note"></p>
     </aside>
   </section>
+
+  <canvas id="compass" width="112" height="92" role="img"
+          aria-label="компас: куда в мозге перед, лево и верх мухи"
+          title="Оси мухи: перед, лево (левая сторона мухи), верх. Поворачиваются вместе с мозгом."></canvas>
 
   <p id="active-hint" hidden>Режим «только активные»: сейчас ни один нейрон не светится. Включите стимул слева.</p>
   <p id="toast" role="status" hidden></p>

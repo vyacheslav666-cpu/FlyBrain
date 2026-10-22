@@ -128,7 +128,7 @@ export function createViewPanel(handlers, shapes) {
 
 const NARROW_PX = 760; // окно уже этого: панели закрывали бы облако, поэтому сначала скрыты
 
-/** Кнопка и клавиша H: скрыть или показать панели (остаётся только облако, контур и компас). */
+/** Кнопка и клавиша H: скрыть или показать панели (остаются облако, контур и компас внизу посередине). */
 export function createPanelsToggle() {
   const button = document.getElementById("panels-toggle");
   const set = (hidden) => {
