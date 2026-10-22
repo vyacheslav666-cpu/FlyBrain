@@ -294,9 +294,11 @@ function start({ meta, stimuli, executors, positions, classes }) {
   const camera = new THREE.PerspectiveCamera(40, 1, 1, 6000);
   // Оси данных: x — к левой стороне мухи, y — вниз, z — назад (D-025), поэтому «верх» у камеры — это −y.
   camera.up.set(0, -1, 0);
-  // Вид спереди (перед мухи — малые z), чуть сверху и сбоку.
+  // Вид по умолчанию: спереди (перед мухи — малые z), чуть сверху и сбоку. Кнопка «Вид по умолчанию» и клавиша R
+  // возвращают камеру сюда (D-046).
+  const HOME_DIRECTION = new THREE.Vector3(0.28, -0.22, -0.93).normalize();
   const distance = meta.radius * 3.1;
-  camera.position.set(distance * 0.28, -distance * 0.22, -distance * 0.93);
+  camera.position.copy(HOME_DIRECTION).multiplyScalar(distance);
 
   const { points, material, geometry, offset, palette } = buildPoints(meta, positions, classes);
   scene.add(points);
@@ -517,15 +519,9 @@ function start({ meta, stimuli, executors, positions, classes }) {
     if (progress >= 1) flight = null;
   }
 
-  // ---------- ракурсы ----------
-  // Оси данных: x — к левой стороне мухи, y — вниз, z — назад (D-025); перед мухи — малые z.
-  // «Сверху» чуть сдвинуто к задней стороне: иначе камера смотрела бы вдоль собственной оси «вверх», экранное
-  // «вверх» стало бы неопределённым (и OrbitControls не пускает ровно в полюс). Наклон ≈ 2°.
-  const VIEWS = {
-    front: new THREE.Vector3(0, 0, -1),
-    top: new THREE.Vector3(0, -Math.cos(0.04), Math.sin(0.04)),
-    side: new THREE.Vector3(1, 0, 0),
-  };
+  // ---------- вид по умолчанию ----------
+  // Раньше были ракурсы «Спереди / Сверху / Сбоку» (D-036); по просьбе пользователя остался один — тот, что при запуске (D-046).
+  const VIEWS = { home: HOME_DIRECTION };
   const VIEW_MATCH = 0.998; // камера «стоит» в ракурсе, если отклонилась меньше чем на ~3,6°
   const viewDistance = meta.radius * 3.1;
 
@@ -680,7 +676,9 @@ function start({ meta, stimuli, executors, positions, classes }) {
   window.addEventListener("keydown", (event) => {
     if (document.activeElement?.tagName === "INPUT" && document.activeElement.type !== "range") return;
     if (event.key === "Escape" && pinned >= 0) unpin();
-    if (event.code === "KeyF" && !event.ctrlKey && !event.metaKey && !event.altKey) fps.toggle(); // «а» на русской раскладке — та же клавиша
+    if (event.ctrlKey || event.metaKey || event.altKey) return;
+    if (event.code === "KeyF") fps.toggle(); // «а» на русской раскладке — та же клавиша
+    if (event.code === "KeyR") flyToView("home"); // «к» на русской раскладке
   });
 
   function resize() {

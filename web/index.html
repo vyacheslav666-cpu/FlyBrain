@@ -75,11 +75,8 @@
     <div class="view-top">
       <div class="view-main">
         <h2>Вид</h2>
-        <div class="view-row" role="group" aria-label="ракурс камеры">
-          <button type="button" data-view="front" aria-pressed="false" title="Смотрим мухе в лицо">Спереди</button>
-          <button type="button" data-view="top" aria-pressed="false" title="Смотрим на мозг сверху, перед мухи — вверх на экране">Сверху</button>
-          <button type="button" data-view="side" aria-pressed="false" title="Смотрим на левый бок мухи, перед — слева на экране">Сбоку</button>
-        </div>
+        <button type="button" data-view="home" class="view-wide" aria-pressed="false"
+                title="Камера возвращается туда, где стоит при запуске: спереди, чуть сверху и сбоку, на весь мозг. Клавиша R">↺ Вид по умолчанию (R)</button>
         <button type="button" id="view-active" class="view-wide" aria-pressed="false"
                 title="Прячет тусклое облако: видны только нейроны, которые выстрелили за время «шлейфа». Выбирать мышью тоже можно только их">Только активные</button>
         <button type="button" id="view-shapes" class="view-wide" aria-pressed="false">Формы нейронов</button>
@@ -115,7 +112,7 @@
     <p>Левая кнопка мыши — вращать, колесо — приблизить, правая кнопка — сдвинуть.
     Наведите на точку — появится подсказка; щелчок закрепляет нейрон и показывает его связи.
     Светятся нейроны, которые только что выстрелили в модели.
-    Вид спереди: муха смотрит на вас, её левая сторона — справа на экране. Клавиша H — скрыть панели, F — частота кадров.</p>
+    Вид спереди: муха смотрит на вас, её левая сторона — справа на экране. Клавиша H — скрыть панели, R — вид по умолчанию, F — частота кадров.</p>
     <p class="credits">Данные: коннектом мозга взрослой дрозофилы FlyWire (Dorkenwald et al. 2024;
     Schlegel et al. 2024), лицензия CC&nbsp;BY&nbsp;4.0; модель — Shiu et al. 2024.
     <button id="about-open" type="button">ⓘ О проекте: итоги проверки, упрощения, источники</button></p>
