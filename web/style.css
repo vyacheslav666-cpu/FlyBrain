@@ -62,7 +62,7 @@ html, body {
 }
 #help p { margin: 0 0 2px; }
 #help .credits { opacity: 0.75; }
-#about-open {
+#help .footer-button {
   margin-left: 6px;
   padding: 1px 9px;
   background: rgba(12, 16, 26, 0.8);
@@ -73,7 +73,7 @@ html, body {
   cursor: pointer;
   pointer-events: auto; /* подсказка внизу мышь пропускает, а кнопка — нет */
 }
-#about-open:hover { background: rgba(95, 240, 255, 0.14); }
+#help .footer-button:hover { background: rgba(95, 240, 255, 0.14); }
 
 #error {
   position: fixed;
@@ -582,8 +582,8 @@ body.panels-hidden #view { display: none; }
   .view-slider { grid-template-columns: 74px 1fr 40px; gap: 6px; }
 }
 
-/* ---------- окно «О проекте» (C13, D-039) ---------- */
-#about {
+/* ---------- окна «О проекте» (C13, D-039) и «Управление» (D-049) ---------- */
+.info-dialog {
   width: min(760px, calc(100vw - 32px));
   max-height: calc(100vh - 48px);
   padding: 0;
@@ -595,8 +595,8 @@ body.panels-hidden #view { display: none; }
   font-size: 13.5px;
   line-height: 1.5;
 }
-#about[open] { display: flex; flex-direction: column; }
-#about::backdrop { background: rgba(0, 0, 0, 0.6); }
+.info-dialog[open] { display: flex; flex-direction: column; }
+.info-dialog::backdrop { background: rgba(0, 0, 0, 0.6); }
 .about-head { display: flex; align-items: center; justify-content: space-between; padding: 14px 18px 10px; border-bottom: 1px solid rgba(255, 255, 255, 0.08); }
 .about-head h2 { margin: 0; font-size: 17px; font-weight: 600; }
 .about-close { padding: 0 6px; background: none; border: 0; color: var(--muted); font-size: 22px; line-height: 1; cursor: pointer; }
@@ -620,7 +620,20 @@ body.panels-hidden #view { display: none; }
 .about-info { color: var(--muted); }
 .about-verdicts li { margin: 5px 0; }
 .about-refs li { margin: 5px 0; }
+#controls { width: min(620px, calc(100vw - 32px)); }
+.controls-table td:first-child { width: 38%; color: var(--muted); }
+.controls-table kbd {
+  display: inline-block;
+  min-width: 22px;
+  padding: 0 6px;
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  border-bottom-width: 2px;
+  border-radius: 5px;
+  color: var(--text);
+  font: 12px Consolas, monospace;
+  text-align: center;
+}
 @media (max-width: 520px) {
   .about-table th:nth-child(2), .about-table td:nth-child(2) { font-size: 12px; }
-  #about-open { margin: 4px 0 0; }
+  #help .footer-button { margin: 4px 0 0; }
 }

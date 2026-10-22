@@ -108,16 +108,55 @@
   <button id="panels-toggle" type="button" hidden aria-pressed="false" title="Клавиша H">Скрыть панели</button>
 
   <footer id="help">
-    <p>Левая кнопка мыши — вращать, колесо — приблизить, правая кнопка — сдвинуть.
-    Наведите на точку — появится подсказка; щелчок закрепляет нейрон и показывает его связи.
-    Светятся нейроны, которые только что выстрелили в модели.
-    Вид спереди: муха смотрит на вас, её левая сторона — справа на экране. Клавиша H — скрыть панели, R — вид по умолчанию, F — частота кадров.</p>
     <p class="credits">Данные: коннектом мозга взрослой дрозофилы FlyWire (Dorkenwald et al. 2024;
     Schlegel et al. 2024), лицензия CC&nbsp;BY&nbsp;4.0; модель — Shiu et al. 2024.
-    <button id="about-open" type="button">ⓘ О проекте: итоги проверки, упрощения, источники</button></p>
+    <button id="controls-open" class="footer-button" type="button">⌨ Управление</button>
+    <button id="about-open" class="footer-button" type="button">ⓘ О проекте: итоги проверки, упрощения, источники</button></p>
   </footer>
 
-  <dialog id="about" aria-labelledby="about-title">
+  <dialog id="controls" class="info-dialog" aria-labelledby="controls-title">
+    <div class="about-head">
+      <h2 id="controls-title">Управление</h2>
+      <button type="button" class="about-close" title="закрыть (Esc)" aria-label="закрыть">×</button>
+    </div>
+    <div class="about-body">
+      <h3>Мышь</h3>
+      <table class="about-table controls-table">
+        <tr><td>вращать мозг</td><td>левая кнопка — тянуть</td></tr>
+        <tr><td>приблизить, отдалить</td><td>колесо</td></tr>
+        <tr><td>сдвинуть</td><td>правая кнопка — тянуть</td></tr>
+        <tr><td>узнать, что за нейрон</td><td>навести мышь на точку — появится подсказка</td></tr>
+        <tr><td>закрепить нейрон и увидеть его связи</td><td>щёлкнуть по точке; снять — щелчок по пустому месту, Esc или «×» на карточке</td></tr>
+      </table>
+
+      <h3>Клавиши</h3>
+      <table class="about-table controls-table">
+        <tr><td><kbd>H</kbd></td><td>скрыть или показать панели</td></tr>
+        <tr><td><kbd>R</kbd></td><td>вид по умолчанию: камера возвращается туда, где стоит при запуске</td></tr>
+        <tr><td><kbd>F</kbd></td><td>частота кадров</td></tr>
+        <tr><td><kbd>Esc</kbd></td><td>снять выбор нейрона; закрыть это окно</td></tr>
+      </table>
+      <p class="about-muted">Клавиши работают и на русской раскладке (там это «р», «к», «а»).</p>
+
+      <h3>Панели и карточка нейрона</h3>
+      <table class="about-table controls-table">
+        <tr><td>передвинуть</td><td>тянуть за полосу с точками у левого края или за название</td></tr>
+        <tr><td>изменить размер</td><td>тянуть уголок справа внизу</td></tr>
+        <tr><td>свернуть, развернуть</td><td>кнопка «−» / «+» справа вверху</td></tr>
+        <tr><td>вернуть как было</td><td>двойной щелчок по названию — место и размер; по уголку — только размер</td></tr>
+      </table>
+
+      <h3>Что на экране</h3>
+      <ul>
+        <li>Светятся нейроны, которые только что выстрелили в модели. Тусклое облако — все остальные.</li>
+        <li>Вид спереди: муха смотрит на вас, её левая сторона — справа на экране. Компас внизу посередине показывает,
+        где у мухи перед, лево и верх.</li>
+        <li>Цвет точки — класс нейрона; список цветов — в панели «Вид», «Классы нейронов».</li>
+      </ul>
+    </div>
+  </dialog>
+
+  <dialog id="about" class="info-dialog" aria-labelledby="about-title">
     <div class="about-head">
       <h2 id="about-title">О проекте FlyBrain</h2>
       <button type="button" class="about-close" title="закрыть (Esc)" aria-label="закрыть">×</button>

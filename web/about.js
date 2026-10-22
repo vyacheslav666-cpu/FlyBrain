@@ -64,8 +64,20 @@ function renderValidation(target, summary) {
     "Пороги записаны до написания кода (D-018), модель не подгонялась."));
 }
 
+/** Окно `dialogId` открывается кнопкой `buttonId`; закрывается «×», Esc и щелчком по затемнению вокруг. */
+export function setupDialog(dialogId, buttonId, onOpen) {
+  const dialog = document.getElementById(dialogId);
+  document.getElementById(buttonId).addEventListener("click", () => {
+    onOpen?.();
+    dialog.showModal();
+  });
+  dialog.querySelector(".about-close").addEventListener("click", () => dialog.close());
+  dialog.addEventListener("click", (event) => { if (event.target === dialog) dialog.close(); });
+  // Клавиши H, R и F, пока окно открыто, не должны прятать панели, двигать камеру и включать счётчик кадров позади него.
+  dialog.addEventListener("keydown", (event) => { if (event.key !== "Escape") event.stopPropagation(); });
+}
+
 export function createAbout() {
-  const dialog = document.getElementById("about");
   const target = document.getElementById("about-validation");
   let loaded = false;
 
@@ -83,13 +95,7 @@ export function createAbout() {
     }
   }
 
-  document.getElementById("about-open").addEventListener("click", () => {
-    if (!loaded) load();
-    dialog.showModal();
-  });
-  dialog.querySelector(".about-close").addEventListener("click", () => dialog.close());
-  // Щелчок по затемнению вокруг окна тоже закрывает его.
-  dialog.addEventListener("click", (event) => { if (event.target === dialog) dialog.close(); });
-  // Клавиши H и F, пока окно открыто, не должны прятать панели и включать счётчик кадров позади него.
-  dialog.addEventListener("keydown", (event) => { if (event.key !== "Escape") event.stopPropagation(); });
+  setupDialog("about", "about-open", () => { if (!loaded) load(); });
+  // Окно «Управление» (D-049): всё, что раньше было мелким текстом внизу экрана.
+  setupDialog("controls", "controls-open");
 }
