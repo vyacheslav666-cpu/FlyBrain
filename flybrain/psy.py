@@ -10,8 +10,14 @@
 3. `thresholds` — порог «исполнителя» по частоте стимула при каждой дозе;
 4. `spont` — без стимула, с шумом мембраны σ;
 5. `broad` — основной опыт с широким критерием серотониновых нейронов (проверка устойчивости).
+Уточнение P1b (D-058…D-061, раздел `p1b` в `config/psy.yaml`):
+6. `mech` — откуда «зажигание»: доза 0, шум σ на 1 с, затем шум выключен; связи модели меняются по вариантам
+   (`flybrain.psymech`): без синапсов KC → KC, выход APL ×2 и ×4, без DAN → KC, без DPM → KC;
+7. `kc_runaway`, `kc_main`, `kc_thresholds`, `kc_spont` — сетка P1 в режиме «KC тормозятся» (у клеток Кеньона
+   порог от дозы не снижается, а повышается — как от рецептора 5-HT1A);
+8. `hyst` — гистерезис: доза до разгона, затем обратно в 0 (`flybrain.psymech`).
 Каждый расчёт сохраняется в `data/psy/` и при следующем запуске берётся оттуда, если ничего не изменилось.
-Отчёт — `docs/psy/results.md` и картинки в `docs/psy/` (модуль `flybrain.psyreport`).
+Отчёты — `docs/psy/results.md` (P1, модуль `flybrain.psyreport`) и `docs/psy/p1b.md` (P1b, `flybrain.p1breport`).
 """
 
 import json
@@ -40,7 +46,11 @@ RESULT_FORMAT = 1
 ACTIVE_HZ = 1.0  # «активный» — не меньше 1 Гц в среднем (D-018)
 KEY_READOUTS = ("MN9", "aBN1", "GF", "aDN1", "aDN2")
 VISUAL_SUPER_CLASSES = ("optic", "visual_projection", "visual_centrifugal")
-PARTS = ("runaway", "main", "thresholds", "spont", "broad")
+P1_PARTS = ("runaway", "main", "thresholds", "spont", "broad")
+P1B_PARTS = ("mech", "kc_runaway", "kc_main", "kc_thresholds", "kc_spont", "hyst")
+PARTS = P1_PARTS + P1B_PARTS
+MODES = ("p1", "kc_inhibit")  # P1: все мишени возбуждаются; P1b: клетки Кеньона тормозятся (D-060)
+KC_CLASS = "Kenyon_Cell"
 
 
 class PsyError(Exception):
@@ -84,6 +94,7 @@ class PsyConfig:
     sigmas_mv: tuple[float, ...]
     spont_trials: int
     warmup_ms: float
+    p1b: "P1bConfig | None" = None
 
     def condition(self, key: str) -> Condition:
         return next(c for c in self.conditions if c.key == key)
@@ -93,6 +104,53 @@ class PsyConfig:
         """Дозы основного опыта и доза разгона (если найдена) — по возрастанию, без повторов."""
         extra = () if self.runaway_dose is None else (self.runaway_dose,)
         return tuple(sorted(set(self.doses) | set(extra)))
+
+
+@dataclass(frozen=True)
+class P1bConfig:
+    """Уточнение P1b (D-058…D-061)."""
+    mech_variants: tuple[str, ...]
+    mech_sigmas_mv: tuple[float, ...]
+    mech_trials: int
+    mech_noise_ms: float
+    mech_off_ms: float
+    mech_dose_variant: str
+    mech_dose_doses: tuple[float, ...]
+    kc_runaway_doses: tuple[float, ...]
+    kc_doses: tuple[float, ...]
+    kc_runaway_dose: float | None
+    kc_threshold_doses: tuple[float, ...]
+    kc_spont_sigma_mv: float
+    hyst_trials: int
+    hyst_sigma_mv: float
+    hyst_condition: str
+    hyst_on_ms: float
+    hyst_back_ms: float
+    hyst_quiet_ms: float
+    hyst_reset_ms: float
+
+    @property
+    def kc_main_doses(self) -> tuple[float, ...]:
+        extra = () if self.kc_runaway_dose is None else (self.kc_runaway_dose,)
+        return tuple(sorted(set(self.kc_doses) | set(extra)))
+
+
+def _load_p1b(raw: dict | None) -> P1bConfig | None:
+    if not raw:
+        return None
+    mech, kc, hyst = raw["mechanism"], raw["kc_inhibit"], raw["hysteresis"]
+    return P1bConfig(
+        mech_variants=tuple(mech["variants"]), mech_sigmas_mv=tuple(float(s) for s in mech["sigmas_mv"]),
+        mech_trials=int(mech["trials"]), mech_noise_ms=float(mech["noise_ms"]), mech_off_ms=float(mech["off_ms"]),
+        mech_dose_variant=mech["dose_check"]["variant"],
+        mech_dose_doses=tuple(float(d) for d in mech["dose_check"]["doses"]),
+        kc_runaway_doses=tuple(float(d) for d in kc["runaway_doses"]), kc_doses=tuple(float(d) for d in kc["doses"]),
+        kc_runaway_dose=None if kc.get("runaway_dose") is None else float(kc["runaway_dose"]),
+        kc_threshold_doses=tuple(float(d) for d in kc["threshold_doses"]),
+        kc_spont_sigma_mv=float(kc["spont_sigma_mv"]), hyst_trials=int(hyst["trials"]),
+        hyst_sigma_mv=float(hyst["sigma_mv"]), hyst_condition=hyst["condition"], hyst_on_ms=float(hyst["on_ms"]),
+        hyst_back_ms=float(hyst["back_ms"]), hyst_quiet_ms=float(hyst["quiet_ms"]),
+        hyst_reset_ms=float(hyst["reset_ms"]))
 
 
 def load_config(path: Path = CONFIG_FILE) -> PsyConfig:
@@ -115,8 +173,11 @@ def load_config(path: Path = CONFIG_FILE) -> PsyConfig:
         runaway_dose=None if raw.get("runaway_dose") is None else float(raw["runaway_dose"]),
         conditions=conditions, threshold_trials=int(raw["threshold_trials"]),
         sigmas_mv=tuple(float(s) for s in raw["spontaneous"]["sigmas_mv"]),
-        spont_trials=int(raw["spontaneous"]["trials"]), warmup_ms=float(raw["spontaneous"]["warmup_ms"]))
+        spont_trials=int(raw["spontaneous"]["trials"]), warmup_ms=float(raw["spontaneous"]["warmup_ms"]),
+        p1b=_load_p1b(raw.get("p1b")))
     keys = [c.key for c in conditions]
+    if config.p1b and config.p1b.hyst_condition not in keys:
+        raise PsyError("config/psy.yaml: стимул гистерезиса (p1b.hysteresis.condition) — из числа условий")
     if len(set(keys)) != len(keys) or config.runaway_condition not in keys:
         raise PsyError("config/psy.yaml: ключи условий должны быть разными, а условие поиска разгона — из их числа")
     if any(c.modality not in MODALITIES for c in conditions):
@@ -155,10 +216,31 @@ class Setup:
     dominant: np.ndarray  # ведущая модальность, −1 — нет
     keys: list[KeyNeuron]
     sha: dict[str, str]
+    variant_csrs: dict = field(default_factory=dict)  # связи вариантов P1b (flybrain.psymech), по запросу
 
     @property
     def n(self) -> int:
         return len(self.neurons)
+
+    @property
+    def kc_mask(self) -> np.ndarray:
+        """Клетки Кеньона (cell_class = Kenyon_Cell): у них в режиме «KC тормозятся» эффект дозы обратный."""
+        return (self.neurons["cell_class"] == KC_CLASS).to_numpy()
+
+    def shift(self, spec: "RunSpec") -> np.ndarray:
+        """Снижение порога каждого нейрона, мВ, для дозы, критерия и режима расчёта (D-055, D-060)."""
+        inverted = self.kc_mask if spec.mode == "kc_inhibit" else None
+        return threshold_shift(self.synapses[spec.criterion], spec.dose, self.config.delta_v_mv,
+                               self.config.s_half, inverted)
+
+    def csr_of(self, variant: str) -> dict:
+        if variant == "base":
+            return self.csr
+        if variant not in self.variant_csrs:
+            from flybrain.psymech import variant_csr
+
+            self.variant_csrs[variant] = variant_csr(self, variant)
+        return self.variant_csrs[variant]
 
     def stimulated(self, group: str | None) -> np.ndarray:
         if group is None:
@@ -236,11 +318,22 @@ class RunSpec:
     warmup_ms: float
     stimulus_ms: float
     after_ms: float
+    mode: str = "p1"  # P1b: "kc_inhibit" — у клеток Кеньона порог от дозы повышается (D-060)
+    variant: str = "base"  # P1b: изменённые связи модели для поиска механизма (flybrain.psymech, D-058)
+    quiet_after: bool = False  # P1b: после окна выключается шум (а не стимул)
 
     @property
     def key(self) -> str:
         what = f"{self.condition}@{self.hz:g}hz" if self.condition else "nostim"
-        return f"{self.part}__{self.criterion}__{what}__d{self.dose:g}__s{self.sigma:g}__t{self.trials}"
+        key = f"{self.part}__{self.criterion}__{what}__d{self.dose:g}__s{self.sigma:g}__t{self.trials}"
+        # Добавки P1b — только когда они не по умолчанию: ключи (и зёрна) расчётов P1 не меняются.
+        if self.mode != "p1":
+            key += f"__m{self.mode}"
+        if self.variant != "base":
+            key += f"__v{self.variant}"
+        if self.quiet_after:
+            key += "__quiet"
+        return key
 
     @property
     def seed(self) -> int:
@@ -282,19 +375,65 @@ def plan(config: PsyConfig, parts: list[str]) -> list[RunSpec]:
     if "broad" in parts:
         specs += [main("main", config.sensitivity_criterion, c, c.hz, d, config.trials, config.after_ms)
                   for d in config.doses if d > 0 for c in config.conditions]
+    specs += plan_p1b(config, parts)
     unique = list(dict.fromkeys(specs))
     return unique
+
+
+def kc_spec(spec: RunSpec) -> RunSpec:
+    """Тот же расчёт в режиме «KC тормозятся». При дозе 0 режимы совпадают — берётся расчёт P1 (то же зерно)."""
+    from dataclasses import replace
+
+    return spec if spec.dose == 0 else replace(spec, part=f"kc_{spec.part}", mode="kc_inhibit")
+
+
+def plan_p1b(config: PsyConfig, parts: list[str]) -> list[RunSpec]:
+    b = config.p1b
+    if b is None:
+        return []
+    specs = []
+    if "mech" in parts:
+        specs += [RunSpec("mech", None, 0.0, 0.0, config.criterion, s, b.mech_trials, 0.0, b.mech_noise_ms,
+                          b.mech_off_ms, variant=v, quiet_after=True) for v in b.mech_variants for s in b.mech_sigmas_mv]
+    by_key = {c.key: c for c in config.conditions}
+    if "mech" in parts:
+        c = by_key[config.runaway_condition]
+        specs += [RunSpec("mech_runaway", c.key, c.hz, d, config.criterion, 0.0, config.runaway_trials, 0.0,
+                          config.stimulus_ms, config.after_ms, variant=b.mech_dose_variant) for d in b.mech_dose_doses]
+    main = lambda part, c, hz, dose, trials, after: RunSpec(  # noqa: E731
+        part, c.key, hz, dose, config.criterion, 0.0, trials, 0.0, config.stimulus_ms, after)
+    if "kc_runaway" in parts:
+        c = by_key[config.runaway_condition]
+        specs += [kc_spec(main("runaway", c, c.hz, d, config.runaway_trials, config.after_ms))
+                  for d in b.kc_runaway_doses]
+    if "kc_main" in parts:
+        specs += [kc_spec(main("main", c, c.hz, d, config.trials, config.after_ms))
+                  for d in b.kc_main_doses for c in config.conditions]
+    if "kc_thresholds" in parts:
+        specs += [kc_spec(main("thresholds", c, f, d, config.threshold_trials, 0.0))
+                  for d in b.kc_threshold_doses for c in config.conditions for f in c.threshold_hz]
+    if "kc_spont" in parts:
+        specs += [kc_spec(RunSpec("spont", None, 0.0, d, config.criterion, b.kc_spont_sigma_mv, config.spont_trials,
+                                  config.warmup_ms, config.stimulus_ms, 0.0)) for d in b.kc_main_doses]
+    return specs
 
 
 def run_meta(setup: Setup, spec: RunSpec) -> str:
     c = setup.config
     stim = setup.stimulated(setup.config.condition(spec.condition).group if spec.condition else None)
-    return json.dumps({
+    meta = {
         "format": RESULT_FORMAT, "spec": spec.key, "seed": spec.seed, "engine": engine_version(),
         "delta_v_mv": c.delta_v_mv, "s_half": c.s_half, "bin_ms": c.bin_ms, "sha": setup.sha,
         "serotonin": [int(i) for i in setup.sets.indices(spec.criterion)], "stimulated": [int(i) for i in stim],
         "key_neurons": [k.index for k in setup.keys],
-    }, sort_keys=True)
+    }
+    if spec.mode != "p1":  # добавки P1b — только не по умолчанию, чтобы расчёты P1 оставались годными
+        meta["kc_count"] = int(setup.kc_mask.sum())
+    if spec.variant != "base":
+        from flybrain.psymech import variant_description
+
+        meta["variant"] = variant_description(spec.variant)
+    return json.dumps(meta, sort_keys=True)
 
 
 def run_engine(setup: Setup, spec: RunSpec, device: str) -> RunResult:
@@ -303,12 +442,11 @@ def run_engine(setup: Setup, spec: RunSpec, device: str) -> RunResult:
     from flybrain.engine import Engine
 
     started = time.monotonic()
-    csr = setup.csr
+    csr = setup.csr_of(spec.variant)
     engine = Engine(csr["indptr"], csr["indices"], csr["weight"], n_trials=spec.trials, device=device, seed=spec.seed)
     group = setup.config.condition(spec.condition).group if spec.condition else None
     stim = setup.stimulated(group)
-    engine.set_threshold_shift(threshold_shift(setup.synapses[spec.criterion], spec.dose, setup.config.delta_v_mv,
-                                               setup.config.s_half))
+    engine.set_threshold_shift(setup.shift(spec))
     engine.set_noise(spec.sigma)
     dt = engine.params.dt
     to_steps = lambda ms: int(round(ms / dt))  # noqa: E731
@@ -340,6 +478,8 @@ def run_engine(setup: Setup, spec: RunSpec, device: str) -> RunResult:
     window_counts = engine.counts.cpu().numpy().astype(np.int64)
     if len(stim):
         engine.remove_stimulus("excite")
+    if spec.quiet_after:
+        engine.set_noise(0.0)
     advance(warmup + window + after, marks)
     end_counts = engine.counts.cpu().numpy().astype(np.int64)
     on_cuda = engine.device.type == "cuda"
@@ -378,6 +518,16 @@ def save_run(path: Path, result: RunResult, meta: str, device: str) -> None:
                             cumulative=result.cumulative.astype(np.int64), seconds=np.array(result.seconds),
                             meta=np.array(meta), device=np.array(device))
     part.replace(path)
+
+
+def saved_runs(setup: Setup, specs: list[RunSpec]) -> dict[RunSpec, RunResult]:
+    """Уже посчитанные расчёты из `data/psy/` (с теми же настройками); чего нет — пропускается."""
+    runs = {}
+    for spec in specs:
+        result = load_saved(spec.file(), run_meta(setup, spec))
+        if result is not None:
+            runs[spec] = result
+    return runs
 
 
 def collect(setup: Setup, parts: list[str], device: str = "auto", rerun: bool = False,
@@ -560,9 +710,22 @@ def run_psy(device: str = "auto", rerun: bool = False, parts: list[str] | None =
             parts = ["runaway"]
         setup = load_setup(config)
         started = time.monotonic()
-        runs = collect(setup, parts, device=device, rerun=rerun)
-        results = analyse(setup, runs)
+        collect(setup, [p for p in parts if p != "hyst"], device=device, rerun=rerun)
+        hysteresis = None
+        if config.p1b is not None:
+            from flybrain.psymech import run_hysteresis
+
+            hysteresis = run_hysteresis(setup, device=device, rerun=rerun and "hyst" in parts,
+                                        compute="hyst" in parts)
+        # Отчёты — по всем готовым расчётам, а не только по посчитанным сейчас: `--only` не обрезает отчёт.
+        runs = saved_runs(setup, plan(config, list(PARTS)))
+        p1_specs = set(plan(config, list(P1_PARTS)))
+        results = analyse(setup, {s: r for s, r in runs.items() if s in p1_specs})
         written = write_report(results)
+        if config.p1b is not None:
+            from flybrain.p1breport import write_p1b_report
+
+            written += write_p1b_report(analyse(setup, runs), hysteresis)
     except (PsyError, OSError) as exc:
         print(f"[ОШИБКА] {exc}", file=sys.stderr)
         return 1

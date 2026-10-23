@@ -141,3 +141,65 @@ def test_serotonin_sets_on_flywire_783():
     types = set(neurons["cell_type"][strict])
     assert {"CSD", "DPM", "5-HTPMPD01", "5-HTPMPV01", "5-HTPMPV03"} <= types
     assert not {"Delta7", "FC3", "hDeltaC"} & types  # серотонин у них — только по РНК (EASI-FISH)
+
+
+# ---------- P1b (D-058…D-061) ----------
+
+def test_kc_inhibit_mode_raises_kc_threshold_and_is_zero_at_dose_zero():
+    s = np.array([0, 5, 5, 20])
+    kc = np.array([False, False, True, True])
+    shift = threshold_shift(s, 2.0, 1.0, 5, inverted=kc)
+    assert shift == pytest.approx([0, 1.0, -1.0, -1.6])  # у KC порог выше, у остальных ниже
+    assert not threshold_shift(s, 0.0, 1.0, 5, inverted=kc).any()  # доза 0 — тот же прежний путь движка
+
+
+def test_p1b_keeps_p1_runs_and_dose_zero_is_p1():
+    from flybrain.psy import P1_PARTS, PARTS, kc_spec
+
+    config = load_config()
+    p1 = plan(config, list(P1_PARTS))
+    everything = plan(config, list(PARTS))
+    assert len(p1) == 171 and set(p1) <= set(everything)  # расчёты P1 — те же
+    spec = RunSpec("main", "sugar_40hz", 40.0, 0.0, "strict", 0.0, 30, 0.0, 1000.0, 500.0)
+    assert spec.key == "main__strict__sugar_40hz@40hz__d0__s0__t30"  # ключ (и зерно) P1 не изменился
+    assert kc_spec(spec) is spec  # при дозе 0 «KC тормозятся» — это ровно расчёт P1
+    other = kc_spec(RunSpec("main", "sugar_40hz", 40.0, 2.5, "strict", 0.0, 30, 0.0, 1000.0, 500.0))
+    assert other.mode == "kc_inhibit" and other.part == "kc_main" and other.key.endswith("__mkc_inhibit")
+    assert other.seed != spec.seed
+
+
+def test_variant_csr_changes_only_its_synapses():
+    from flybrain.psymech import variant_csr
+
+    config = load_config()
+    setup = _fake_setup(config)
+    # 0, 1 — KC; 2 — APL; 3 — DAN; 4 — DPM. Связи: 0→1 (KC→KC), 2→0 (APL→KC, −3), 3→0 (DAN→KC), 4→1 (DPM→KC), 1→5.
+    setup.neurons["cell_class"] = ["Kenyon_Cell", "Kenyon_Cell", None, "DAN", None, None]
+    setup.neurons["cell_type"] = [None, None, "APL", None, "DPM", None]
+    setup.neurons["sign"] = [1, 1, -1, 1, 1, 1]
+    indptr = np.array([0, 2, 4, 4, 4, 4, 5])
+    indices = np.array([2, 3, 0, 4, 1], dtype=np.int32)
+    weight = np.array([-3, 6, 7, 8, 9], dtype=np.int16)
+    setup.csr = {"indptr": indptr, "indices": indices, "weight": weight}
+    assert list(variant_csr(setup, "no_kc_kc")["weight"]) == [-3, 6, 0, 8, 9]
+    assert list(variant_csr(setup, "apl_x4")["weight"]) == [-12, 6, 7, 8, 9]
+    assert list(variant_csr(setup, "no_dan_kc")["weight"]) == [-3, 0, 7, 8, 9]
+    assert list(variant_csr(setup, "no_dpm_kc")["weight"]) == [-3, 6, 7, 0, 9]
+    assert list(weight) == [-3, 6, 7, 8, 9]  # исходные связи не тронуты
+
+
+def test_hysteresis_summary_finds_when_activity_stops():
+    from flybrain.psymech import summarize
+
+    # Шаг 100 мс; A = 0–500 мс горит в обоих повторах; в фазе B (500–1000) первый гаснет через 200 мс, второй — нет.
+    edges = np.arange(0, 1501, 100.0)
+    rate = np.zeros((15, 2))
+    rate[:5] = 600_000
+    rate[5:7, 0] = 600_000
+    rate[5:10, 1] = 600_000
+    cumulative = np.vstack([np.zeros(2), np.cumsum(rate * 0.1, axis=0)])
+    data = {"edges_ms": edges, "cumulative": cumulative,
+            "phases": [("A", 500.0), ("B", 1000.0), ("C", 1200.0), ("D", 1500.0)]}
+    s = summarize(data)
+    assert s["lit"]["A"] == [True, True] and s["lit"]["B"] == [False, True]
+    assert s["out_ms"] == [200.0, None]
