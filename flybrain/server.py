@@ -14,7 +14,7 @@ from fastapi import FastAPI, HTTPException, Query, WebSocket, WebSocketDisconnec
 from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
 
-from flybrain import docpage, executors, live, processed, skeletons, stimuli, webdata
+from flybrain import docpage, executors, live, processed, psylive, skeletons, stimuli, webdata
 from flybrain.engine import Engine
 from flybrain.groups import load_group_config
 from flybrain.lookup import NeuronLookup
@@ -76,9 +76,11 @@ def create_app(processed_dir=PROCESSED_DIR, web_dir=WEB_DIR, skeleton_dir=skelet
         state["executors"] = executors.build_panel(
             groups, neurons, state["lookup"].label, _paper_root_ids(load_group_config()), executors.load_config(),
             {button["key"] for button in buttons}, names["sides"])
+        # Панель «Психоделик (эксперимент)» (P2, D-064): данные P1/P1b; нет таблицы аннотаций — панель недоступна.
+        state["psy"] = psylive.PsyLive.load(processed_dir)
         state["live"] = live.LiveSim(
             lambda: Engine(connectivity["indptr"], connectivity["indices"], connectivity["weight"], n_trials=1),
-            stimulus_indices)
+            stimulus_indices, psy=state["psy"])
         state["live"].start()
         yield
         state["live"].stop()
@@ -109,6 +111,11 @@ def create_app(processed_dir=PROCESSED_DIR, web_dir=WEB_DIR, skeleton_dir=skelet
     @app.get("/api/executors")
     def executor_panel() -> JSONResponse:
         return JSONResponse(state["executors"], headers={"Cache-Control": "no-cache"})
+
+    @app.get("/api/psy")
+    def psy_panel() -> JSONResponse:
+        """Панель «Психоделик»: пределы ползунков, мВ на единицу дозы, слой серотониновых нейронов и мишеней (P2)."""
+        return JSONResponse(state["psy"].info(), headers={"Cache-Control": "no-cache"})
 
     @app.get("/api/stimuli")
     def stimulus_panel() -> JSONResponse:

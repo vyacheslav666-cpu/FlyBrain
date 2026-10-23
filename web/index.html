@@ -36,7 +36,7 @@
     <h2>Живой мозг</h2>
     <div class="live-buttons">
       <button id="live-pause" type="button" disabled>⏸ Пауза</button>
-      <button id="live-reset" type="button" disabled title="все нейроны — в покой, время модели — с нуля; включённые стимулы остаются">↺ Сброс</button>
+      <button id="live-reset" type="button" disabled title="Все нейроны — в покой, время модели — с нуля. Гасит «зажжённую» сеть (панель «Психоделик»). Включённые стимулы, доза и шум остаются">↺ Сброс</button>
     </div>
     <div class="live-slow">
       <label for="live-slow" class="live-slow-label">Скорость показа</label>
@@ -52,6 +52,37 @@
     <p id="live-state" class="live-note">Подключаюсь к серверу…</p>
     <p id="live-quiet" class="live-quiet">В покое мозг молчит — это свойство модели: в модели Shiu нет
     спонтанной активности. Живой мозг мухи в покое не молчит.</p>
+  </section>
+
+  <section id="psy" hidden>
+    <h2>Психоделик (эксперимент)</h2>
+    <p class="psy-honesty">Вычислительная гипотеза, не ощущения мухи. <a href="/docs/EXPERIMENT_PSY.md" target="_blank"
+      rel="noopener" title="Опыты P1 и P1b: что сделано и что из этого не следует">Подробно</a></p>
+    <p id="psy-unavailable" class="live-note"></p>
+    <div id="psy-controls">
+      <div class="psy-row">
+        <label for="psy-dose">Доза</label><span id="psy-dose-text" class="psy-value"></span>
+      </div>
+      <input id="psy-dose" type="range" min="0" max="6" step="0.25" value="0" disabled>
+      <p id="psy-dose-mv" class="live-note"></p>
+      <div class="psy-modes" role="group" aria-label="режим">
+        <button type="button" data-psy-mode="p1" aria-pressed="true" disabled
+                title="Порог снижается у всех нейронов, получающих синапсы от серотониновых нейронов (P1)">все мишени возбуждаются (P1)</button>
+        <button type="button" data-psy-mode="kc_inhibit" aria-pressed="false" disabled
+                title="У клеток Кеньона порог от дозы повышается — как от тормозящего рецептора 5-HT1A (P1b)">клетки Кеньона тормозятся (P1b)</button>
+      </div>
+      <div class="psy-row">
+        <label for="psy-sigma">Шум мембраны</label><span id="psy-sigma-text" class="psy-value"></span>
+      </div>
+      <input id="psy-sigma" type="range" min="0" max="3" step="0.25" value="0" disabled>
+      <p id="psy-sigma-hint" class="live-note"></p>
+      <p class="psy-lamp-row">Индикатор: <b id="psy-lamp">сеть не горит</b></p>
+      <p id="psy-meter" class="live-note"></p>
+      <p id="psy-ignited" class="psy-ignited" hidden></p>
+      <button id="psy-layer" type="button" class="psy-wide" aria-pressed="false"
+              title="Подсветить в 3D серотониновые нейроны и нейроны, которые получают от них синапсы">Слой: серотониновые нейроны и мишени</button>
+      <p id="psy-layer-legend" class="live-note" hidden></p>
+    </div>
   </section>
 
   <section id="executors" hidden>

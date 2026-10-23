@@ -7,6 +7,9 @@
 
 Замедление показа (C10) только делает паузы между блоками: каждый блок и каждый шаг по 0,1 мс считается,
 ничего не пропускается.
+
+Панель «Психоделик (эксперимент)» (P2, D-064…D-066; модуль `flybrain.psylive`): доза, режим и шум мембраны меняются
+на ходу теми же средствами движка, что в опытах P1/P1b; индикатор «сеть зажглась» считается по каждому кадру.
 """
 
 import json
@@ -22,6 +25,7 @@ import numpy as np
 import torch
 
 from flybrain.engine import Engine
+from flybrain.psylive import DOSE_MAX, MODES, SIGMA_MAX, IgnitionMeter, PsyLive
 from flybrain.stimuli import DEFAULT_HZ, DEFAULT_SIDE, MAX_HZ
 
 FRAME_FORMAT = 1
@@ -36,6 +40,7 @@ SPEED_WINDOW_SECONDS = 2.0  # скорость — среднее за посл�
 # Ползунок замедления: цель — от SLOW_MIN до 1× реального времени; «без замедления» — цель не задана.
 SLOW_MIN = 0.02
 SLOW_SLIDER_MAX = 0.4  # последнее деление ползунка перед «максимум» (на этой машине модель и так идёт ~0,48×)
+PSY_READING_FRAMES = 10  # показания индикатора «сеть зажглась» — примерно раз в 0,4 с (и сразу, если он переключился)
 
 
 def encode_frame(epoch: int, start_ms: float, end_ms: float, speed: float, neurons: np.ndarray,
@@ -70,7 +75,8 @@ class LiveSim:
     """
 
     def __init__(self, make_engine: Callable[[], Engine], stimuli: dict[str, dict[str, np.ndarray]],
-                 frame_seconds: float = FRAME_SECONDS, max_speed: float | None = MAX_SPEED):
+                 frame_seconds: float = FRAME_SECONDS, max_speed: float | None = MAX_SPEED,
+                 psy: PsyLive | None = None):
         self._make_engine = make_engine
         self._stimuli = {key: {side: np.asarray(ids, dtype=np.int64) for side, ids in sides.items()}
                          for key, sides in stimuli.items()}
@@ -96,6 +102,14 @@ class LiveSim:
         self._speed = 0.0
         self._device = ""
         self._message = ""
+        # Панель «Психоделик» (P2): доза, режим, шум; индикатор считается, только если данные панели есть.
+        self._psy = psy if psy is not None and psy.available else None
+        self._psy_state = {"dose": 0.0, "mode": "p1", "sigma": 0.0}
+        self._meter = IgnitionMeter(len(self._psy.alln_exc)) if self._psy else None
+        self._ignited = False
+        self._frames_since_reading = 0
+        self._stim_index: torch.Tensor | None = None  # стимулируемые сейчас нейроны (их спайки индикатор не считает)
+        self._alln_index: torch.Tensor | None = None
 
     # ---------- из других потоков ----------
 
@@ -124,7 +138,8 @@ class LiveSim:
 
         - {"cmd": "pause" | "resume" | "reset"};
         - {"cmd": "stimulus", "key": "sugar", "on": true, "hz": 100, "side": "left"}: любое из on, hz, side можно не указывать;
-        - {"cmd": "speed", "value": 0.05}: показ в 0,05× реального времени; "value": null — без замедления.
+        - {"cmd": "speed", "value": 0.05}: показ в 0,05× реального времени; "value": null — без замедления;
+        - {"cmd": "psy", "dose": 2.5, "mode": "p1" | "kc_inhibit", "sigma": 1.0}: любое можно не указывать (P2).
         """
         cmd = message.get("cmd")
         if cmd in ("pause", "resume", "reset"):
@@ -133,6 +148,8 @@ class LiveSim:
             clean = self._clean_stimulus(message)
         elif cmd == "speed":
             clean = self._clean_speed(message)
+        elif cmd == "psy" and self._psy is not None:
+            clean = self._clean_psy(message)
         else:
             clean = None
         if clean is not None:
@@ -169,13 +186,29 @@ class LiveSim:
             return None
         return {"cmd": "speed", "value": min(max(float(value), SLOW_MIN), 1.0)}
 
+    @staticmethod
+    def _clean_psy(message: dict) -> dict | None:
+        clean: dict = {"cmd": "psy"}
+        for field, top in (("dose", DOSE_MAX), ("sigma", SIGMA_MAX)):
+            if field in message:
+                value = message[field]
+                if isinstance(value, bool) or not isinstance(value, (int, float)) or not math.isfinite(value):
+                    return None
+                clean[field] = min(max(float(value), 0.0), top)
+        if "mode" in message:
+            if message["mode"] not in MODES:
+                return None
+            clean["mode"] = message["mode"]
+        return clean
+
     def status(self) -> dict:
         return {"type": "status", "state": self._state, "paused": self._paused,
                 "stimuli": {key: dict(state) for key, state in self._stimulus_state.items()},
                 "target_speed": self._target_speed, "slow_min": SLOW_MIN, "slow_slider_max": SLOW_SLIDER_MAX,
                 "epoch": self._epoch, "time_ms": self.engine.time_ms if self.engine else 0.0,
                 "speed": self._speed, "max_speed": self._max_speed, "device": self._device,
-                "message": self._message}
+                "message": self._message,
+                "psy": {"available": self._psy is not None, **self._psy_state, "ignited": self._ignited}}
 
     def status_json(self) -> str:
         return json.dumps(self.status(), ensure_ascii=False)
@@ -228,6 +261,9 @@ class LiveSim:
             return False
         self.engine = engine
         self._prev_counts = engine.counts[:, 0].clone()
+        if self._psy is not None:
+            self._alln_index = torch.as_tensor(self._psy.alln_exc, device=engine.device)
+            self._stim_index = torch.zeros(0, dtype=torch.int64, device=engine.device)
         self._device = device_label(engine.device)
         self._set_state("paused" if self._paused else "running")
         return True
@@ -252,8 +288,13 @@ class LiveSim:
                 self._epoch += 1
                 self._speed_samples.clear()
                 self._anchor = None
+                if self._meter is not None:  # сброс гасит «зажжённую» сеть: индикатор — заново
+                    self._meter.reset()
+                    self._ignited = False
             elif cmd == "stimulus":
                 self._apply_stimulus(message)
+            elif cmd == "psy":
+                self._apply_psy(message)
             elif cmd == "speed":
                 self._target_speed = message["value"]
                 self._speed_samples.clear()  # счётчик скорости должен показывать новый темп, а не смесь со старым
@@ -271,6 +312,19 @@ class LiveSim:
             self.engine.set_stimulus(key, self._stimuli[key][state["side"]], state["hz"])
         else:
             self.engine.remove_stimulus(key)
+        if self._psy is not None:
+            on = [self._stimuli[k][s["side"]] for k, s in self._stimulus_state.items() if s["on"]]
+            index = np.unique(np.concatenate(on)) if on else np.zeros(0, dtype=np.int64)
+            self._stim_index = torch.as_tensor(index, device=self.engine.device)
+
+    def _apply_psy(self, message: dict) -> None:
+        """Доза, режим, шум — на ходу, теми же средствами движка, что в P1/P1b; при дозе 0 и σ = 0 — прежний расчёт."""
+        state = self._psy_state
+        for field in ("dose", "mode", "sigma"):
+            if field in message:
+                state[field] = message[field]
+        self.engine.set_threshold_shift(self._psy.shift(state["dose"], state["mode"]))
+        self.engine.set_noise(state["sigma"])
 
     def _speed_limit(self) -> float | None:
         """Быстрее какого темпа идти нельзя: цель ползунка и «не быстрее реального времени» (D-017, D-033)."""
@@ -325,6 +379,24 @@ class LiveSim:
         self._update_speed(time.perf_counter(), engine.time_ms)
         self._broadcast(encode_frame(self._epoch, start_ms, engine.time_ms, self._speed,
                                      fired.cpu().numpy(), spikes.cpu().numpy()))
+        if self._meter is not None:
+            self._measure(start_ms, engine.time_ms, delta)
+
+    def _measure(self, start_ms: float, end_ms: float, delta: torch.Tensor) -> None:
+        """Индикатор «сеть зажглась» (D-064): спайки не стимулируемых нейронов и петля усиковой доли за кадр."""
+        total = int(delta.sum())
+        if len(self._stim_index):
+            total -= int(delta[self._stim_index].sum())
+        self._meter.add(start_ms, end_ms, total, (delta[self._alln_index] > 0).cpu().numpy())
+        ignited = self._meter.ignited
+        self._frames_since_reading += 1
+        switched = ignited != self._ignited
+        if switched:
+            self._ignited = ignited
+            self._broadcast(self.status_json())
+        if switched or self._frames_since_reading >= PSY_READING_FRAMES:
+            self._frames_since_reading = 0
+            self._broadcast(json.dumps(self._meter.reading(), ensure_ascii=False))
 
     def _update_speed(self, now: float, time_ms: float) -> None:
         """Скорость (D-017): мс модели за последние ~2 с, делённые на эти 2 с настоящего времени."""

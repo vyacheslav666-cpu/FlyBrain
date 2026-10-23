@@ -263,6 +263,58 @@ span.partner-label { color: var(--muted); }
 }
 .live-rate { font-variant-numeric: tabular-nums; }
 
+/* ---------- панель «Психоделик (эксперимент)» (P2, D-064) ---------- */
+#psy {
+  color-scheme: dark;
+  position: fixed;
+  top: 70px;
+  left: calc(50vw - 160px);
+  width: 320px;
+  max-height: calc(100vh - 70px - var(--bottom-gap) - 12px);
+  background: var(--panel);
+  border: 1px solid rgba(232, 123, 164, 0.45);
+  border-radius: 10px;
+  backdrop-filter: blur(6px);
+  font-size: 13px;
+  line-height: 1.4;
+}
+#psy.ignited { border-color: #ff6a3d; box-shadow: 0 0 0 1px #ff6a3d, 0 0 18px rgba(255, 106, 61, 0.35); }
+#psy h2 { margin: 0 0 6px; font-size: 13px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: 0.06em; }
+#psy button {
+  padding: 5px 8px;
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--text);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 8px;
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+#psy button:hover:not(:disabled) { background: rgba(255, 255, 255, 0.12); }
+#psy button:disabled { opacity: 0.45; cursor: default; }
+#psy button[aria-pressed="true"] { background: rgba(232, 123, 164, 0.2); border-color: #e87ba4; }
+#psy input[type="range"] { width: 100%; margin: 2px 0 0; accent-color: #e87ba4; }
+#psy a { color: #9ec5f4; }
+.psy-honesty { margin: 0 0 8px; padding: 6px 8px; border-left: 3px solid #e87ba4; background: rgba(232, 123, 164, 0.08);
+  border-radius: 4px; font-size: 12px; }
+.psy-row { display: flex; justify-content: space-between; margin-top: 8px; }
+.psy-row label { color: var(--muted); }
+.psy-value { font-variant-numeric: tabular-nums; }
+.psy-modes { display: flex; gap: 6px; margin-top: 8px; }
+.psy-modes button { flex: 1; }
+.psy-wide { width: 100%; margin-top: 10px; }
+.psy-lamp-row { margin: 10px 0 0; }
+#psy.ignited #psy-lamp { color: #ff8a5c; }
+.psy-ignited {
+  margin: 8px 0 0;
+  padding: 8px 10px;
+  background: rgba(255, 106, 61, 0.12);
+  border-left: 3px solid #ff6a3d;
+  border-radius: 4px;
+  font-size: 12px;
+}
+#live-reset.attention:not(:disabled) { border-color: #ff6a3d; background: rgba(255, 106, 61, 0.22); }
+
 /* ---------- панель стимулов и замедление показа (C10, D-034) ---------- */
 #legend h2 { margin: 0 0 8px; }
 #legend h2 button {
@@ -549,7 +601,8 @@ body.dragging-window, body.dragging-window * { cursor: inherit !important; user-
 body.panels-hidden #stimuli,
 body.panels-hidden #executors,
 body.panels-hidden #live,
-body.panels-hidden #view { display: none; }
+body.panels-hidden #view,
+body.panels-hidden #psy { display: none; }
 @media (max-width: 760px) {
   #search { width: min(420px, calc(100vw - 290px)); } /* между названием слева и кнопкой «Скрыть панели» справа */
   #stimuli, #executors, #view { width: calc(50vw - 30px); }

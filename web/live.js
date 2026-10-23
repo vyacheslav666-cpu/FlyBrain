@@ -10,7 +10,7 @@ const RECONNECT_MS = 2000;
  * `count` — число нейронов. `onFrame(neurons, spikes)` — кто выстрелил в кадре; `onStatus(status)` — состояние
  * сервера; `onReset()` — модель сброшена, всё гасим.
  */
-export function connectLive({ count, onFrame, onStatus, onReset, onConnection }) {
+export function connectLive({ count, onFrame, onStatus, onReset, onConnection, onPsy = () => {} }) {
   const windowCounts = new Uint16Array(count); // спайки каждого нейрона в окне частоты
   const frames = []; // кадры внутри окна: {start, end, neurons, spikes}
   const scratch = new Uint16Array(count); // рабочий массив для ratesOf: после каждого вызова снова нулевой
@@ -75,6 +75,7 @@ export function connectLive({ count, onFrame, onStatus, onReset, onConnection })
         return;
       }
       const message = JSON.parse(event.data);
+      if (message.type === "psy") onPsy(message); // показания индикатора «сеть зажглась» (P2)
       if (message.type !== "status") return;
       changeEpoch(message.epoch);
       status = message;

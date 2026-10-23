@@ -4,7 +4,8 @@
 
 import { forgetSavedLayout, makeFloating } from "./floating.js";
 
-const PANEL_IDS = ["stimuli", "executors", "view", "live"];
+const PANEL_IDS = ["stimuli", "executors", "view", "live", "psy"];
+const COLLAPSED_AT_START = new Set(["psy"]); // эксперимент: при запуске свёрнут до заголовка, чтобы не закрывать мозг
 
 /** Содержимое панели — во внутреннюю прокручиваемую обёртку: сама панель не прокручивается, и уголок не уезжает. */
 function wrapContent(panel) {
@@ -36,6 +37,7 @@ export function createPanelResizers() {
 
     makeFloating(panel, {
       handles: [heading, title], collapseButton: collapse, noun: "панель", minWidth: 220, minHeight: 70,
+      collapsed: COLLAPSED_AT_START.has(id),
     });
 
     if (id === "executors") {

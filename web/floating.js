@@ -35,8 +35,8 @@ function raise(root) {
  * `noun` — «карточку» или «панель».
  * Возвращает `fit()` — расставить заново (например, когда окошко показали).
  */
-export function makeFloating(root, { handles, collapseButton, noun, minWidth, minHeight }) {
-  const state = {}; // left/top/width/height/collapsed — только пока страница открыта
+export function makeFloating(root, { handles, collapseButton, noun, minWidth, minHeight, collapsed = false }) {
+  const state = { collapsed }; // left/top/width/height/collapsed — только пока страница открыта
   const has = (key) => Number.isFinite(state[key]);
   root.classList.add("floating");
   for (const handle of handles) handle.classList.add("drag-handle");

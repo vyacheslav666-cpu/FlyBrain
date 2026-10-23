@@ -13,6 +13,8 @@ import { createCard, createSearch, createTooltip, getInfo, getLinks, plural, RAT
 import { connectLive } from "./live.js";
 import { createLinks, createRings } from "./markers.js";
 import { createPicker } from "./picking.js";
+import { createPsyPanel } from "./psy.js";
+import { createPsyLayer } from "./psylayer.js";
 import { createPanelResizers } from "./resize.js";
 import { createSilhouette } from "./silhouette.js";
 import { createSkeletonView, getSkeleton } from "./skeleton.js";
@@ -43,14 +45,17 @@ function formatNumber(number, digits) {
 }
 
 async function loadData() {
-  const [metaResponse, cloudResponse, stimuliResponse, executorsResponse] =
-    await Promise.all([fetch("/api/meta"), fetch("/api/cloud.bin"), fetch("/api/stimuli"), fetch("/api/executors")]);
+  const [metaResponse, cloudResponse, stimuliResponse, executorsResponse, psyResponse] =
+    await Promise.all([fetch("/api/meta"), fetch("/api/cloud.bin"), fetch("/api/stimuli"), fetch("/api/executors"),
+      fetch("/api/psy")]);
   if (!metaResponse.ok || !cloudResponse.ok || !stimuliResponse.ok || !executorsResponse.ok) {
     throw new Error("сервер не отдал данные нейронов");
   }
   const meta = await metaResponse.json();
   const stimuli = await stimuliResponse.json();
   const executors = await executorsResponse.json();
+  // Панель «Психоделик» (P2) необязательна: если сервер её не отдал, остальное работает.
+  const psy = psyResponse.ok ? await psyResponse.json() : { available: false, reason: "сервер не отдал данные панели" };
   const buffer = await cloudResponse.arrayBuffer();
   const [count, version] = new Uint32Array(buffer, 0, 2);
   if (version !== meta.format || count !== meta.total) throw new Error("данные нейронов не подходят к странице");
@@ -58,6 +63,7 @@ async function loadData() {
     meta,
     stimuli,
     executors,
+    psy,
     positions: new Float32Array(buffer, HEADER_BYTES, count * 3),
     classes: new Uint8Array(buffer, HEADER_BYTES + count * 12, count),
   };
@@ -281,7 +287,7 @@ function createLivePanel(onCommand, anyStimulus) {
   };
 }
 
-function start({ meta, stimuli, executors, positions, classes }) {
+function start({ meta, stimuli, executors, psy, positions, classes }) {
   const canvas = document.getElementById("scene");
   const renderer = new THREE.WebGLRenderer({ canvas, antialias: false, alpha: false });
   renderer.setClearColor(0x05070d, 1);
@@ -302,6 +308,9 @@ function start({ meta, stimuli, executors, positions, classes }) {
   const picker = createPicker(geometry, offset, glow.uniforms);
   const silhouette = createSilhouette(positions, classes, offset);
   scene.add(silhouette.object);
+  const { uSizeUm, uMinPx, uMaxPx, uViewportHeight } = material.uniforms;
+  const psyLayer = createPsyLayer(positions, classes, offset, { uSizeUm, uMinPx, uMaxPx, uViewportHeight }, psy);
+  scene.add(psyLayer.object);
 
   // Кольца и линии лежат в тех же координатах, что и облако.
   const hoverRing = createRings({ color: COLOR.hover, sizePx: 22, alpha: 0.9 });
@@ -477,7 +486,7 @@ function start({ meta, stimuli, executors, positions, classes }) {
   }
 
   // Панели, под которыми не должны оказаться найденные нейроны (D-040).
-  const framingPanels = ["stimuli", "view", "executors", "live", "card"].map((id) => document.getElementById(id));
+  const framingPanels = ["stimuli", "view", "executors", "live", "psy", "card"].map((id) => document.getElementById(id));
   const searchBox = document.getElementById("search");
   const helpBox = document.getElementById("help");
   const compassBox = document.getElementById("compass");
@@ -651,19 +660,25 @@ function start({ meta, stimuli, executors, positions, classes }) {
 
   // ---------- живой мозг ----------
   const stimulusPanel = createStimulusPanel(stimuli, (command) => live.send(command));
-  const panel = createLivePanel((command) => live.send(command), () => stimulusPanel.anyOn);
+  const psyPanel = createPsyPanel(psy, (command) => live.send(command), psyLayer);
+  // Плашка «в покое мозг молчит» не нужна, если включён стимул или шум мембраны или сеть «зажглась» (мозг не молчит).
+  const panel = createLivePanel((command) => live.send(command),
+    () => stimulusPanel.anyOn || psyPanel.noiseOn || psyPanel.ignited);
   let executorPanel = null; // создаётся ниже, когда есть `live`
   const live = connectLive({
     count: classes.length,
     onFrame: (neurons, spikes) => glow.spike(neurons, spikes),
     onStatus: (status) => {
       stimulusPanel.setStatus(status);
+      psyPanel.setStatus(status);
       panel.setStatus(status);
       executorPanel?.setStatus(status);
     },
     onReset: () => glow.clear(),
+    onPsy: (reading) => psyPanel.setReading(reading),
     onConnection: (connected) => {
       stimulusPanel.setConnected(connected);
+      psyPanel.setConnected(connected);
       panel.setConnected(connected);
     },
   });
