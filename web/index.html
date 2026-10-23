@@ -110,7 +110,6 @@
                 title="Камера возвращается туда, где стоит при запуске: спереди, чуть сверху и сбоку, на весь мозг. Клавиша R">↺ Вид по умолчанию (R)</button>
         <button type="button" id="view-active" class="view-wide" aria-pressed="false"
                 title="Прячет тусклое облако: видны только нейроны, которые выстрелили за время «шлейфа». Выбирать мышью тоже можно только их">Только активные</button>
-        <button type="button" id="view-shapes" class="view-wide" aria-pressed="false">Формы нейронов</button>
         <button type="button" id="view-shell" class="view-wide" aria-pressed="true" title="Полупрозрачный контур мозга. Это оформление, а не анатомия: поверхность проведена по плотности точек нейронов">Контур</button>
       </div>
     </div>
@@ -134,8 +133,7 @@
           title="Оси мухи: перед, лево (левая сторона мухи), верх. Поворачиваются вместе с мозгом."></canvas>
 
   <p id="active-hint" hidden>Режим «только активные»: сейчас ни один нейрон не светится. Включите стимул слева.</p>
-  <p id="toast" role="status" hidden></p>
-  <div id="fps" hidden></div>
+    <div id="fps" hidden></div>
   <button id="panels-toggle" type="button" hidden aria-pressed="false" title="Клавиша H">Скрыть панели</button>
 
   <footer id="help">
@@ -209,7 +207,7 @@
       <ul>
         <li>Нет обучения и памяти, нет гормонов и нейромодуляторов, нет голода и усталости.</li>
         <li>Нет электрических синапсов (контактов, по которым ток идёт прямо из клетки в клетку): в коннектоме видны только химические.</li>
-        <li>Нейрон — точка, без формы дендритов. Формы нейронов на экране — только картинка.</li>
+        <li>Нейрон — точка, без формы дендритов.</li>
         <li>Знак связи («возбуждает» или «тормозит») угадан по предсказанному медиатору — и угадан не всегда верно. Берём знак из файла модели Shiu.</li>
         <li>Нет брюшного нервного тяжа (аналога спинного мозга), поэтому нет мотонейронов ног — только мотонейроны головы.</li>
         <li>В покое модель молчит: спонтанной активности в ней нет. Живой мозг мухи в покое не молчит.</li>
@@ -222,7 +220,7 @@
       <a href="/docs/DECISIONS.md" target="_blank" rel="noopener">docs/DECISIONS.md</a>.</p>
 
       <h3>Данные и авторы</h3>
-      <p>Коннектом, аннотации и формы нейронов FlyWire распространяются по лицензии
+      <p>Коннектом и аннотации FlyWire распространяются по лицензии
       <a href="https://creativecommons.org/licenses/by/4.0/deed.ru" target="_blank" rel="noopener">CC&nbsp;BY&nbsp;4.0</a>
       (можно использовать с указанием авторов). Авторы:</p>
       <ul class="about-refs">
@@ -242,8 +240,6 @@
         <i>Nature Methods</i>, 2021 — <a href="https://doi.org/10.1038/s41592-021-01183-7" target="_blank" rel="noopener">статья</a> (поиск синапсов).</li>
         <li>Heinrich L. et al. Synaptic cleft segmentation in non-isotropic volume electron microscopy of the complete Drosophila brain.
         MICCAI, 2018 — <a href="https://doi.org/10.1007/978-3-030-00934-2_36" target="_blank" rel="noopener">статья</a> (поиск синапсов).</li>
-        <li>Формы нейронов (необязательно) — скелеты FlyWire 783,
-        <a href="https://zenodo.org/records/10877326" target="_blank" rel="noopener">zenodo.org/records/10877326</a>.</li>
       </ul>
 
       <h3>Код и лицензии</h3>

@@ -9,7 +9,7 @@ import { createFpsMeter } from "./fps.js";
 import { fitDistance, freeArea } from "./framing.js";
 import { createGlow } from "./glow.js";
 import { createExecutorPanel } from "./executors.js";
-import { createCard, createSearch, createTooltip, getInfo, getLinks, plural, RATE_HINT } from "./inspector.js";
+import { createCard, createSearch, createTooltip, getInfo, getLinks, RATE_HINT } from "./inspector.js";
 import { connectLive } from "./live.js";
 import { createLinks, createRings } from "./markers.js";
 import { createPicker } from "./picking.js";
@@ -17,7 +17,6 @@ import { createPsyPanel } from "./psy.js";
 import { createPsyLayer } from "./psylayer.js";
 import { createPanelResizers } from "./resize.js";
 import { createSilhouette } from "./silhouette.js";
-import { createSkeletonView, getSkeleton } from "./skeleton.js";
 import { createStimulusPanel } from "./stimuli.js";
 import { createPanelsToggle, createViewPanel } from "./viewpanel.js";
 
@@ -179,7 +178,6 @@ const COLOR = { hover: 0xffffff, pinned: 0x5ff0ff, search: 0xffc247, input: 0x4f
 const CLICK_MAX_MOVE_PX = 5; // сдвиг мыши больше этого — это вращение, а не щелчок
 const FLIGHT_MS = 900;
 const VIEW_FLIGHT_MS = 1100; // смена ракурса — поворот побольше, поэтому чуть дольше
-const TOAST_MS = 5000;
 const LIVE_TEXT_EVERY_MS = 250; // как часто обновлять цифры живого режима (скорость, частоты)
 const EXECUTORS_EVERY_MS = 100; // панель «исполнителей» обновляется чаще: полоски должны быстро падать
 
@@ -319,8 +317,6 @@ function start({ meta, stimuli, executors, psy, positions, classes }) {
   const inputRings = createRings({ color: COLOR.input, sizePx: 14, alpha: 0.85 });
   const outputRings = createRings({ color: COLOR.output, sizePx: 14, alpha: 0.85 });
   const links = createLinks();
-  const shape = createSkeletonView(offset); // форма закреплённого нейрона (C12b); сдвиг уже внутри
-  scene.add(shape.object);
   const rings = [hoverRing, pinnedRing, searchRings, inputRings, outputRings];
   for (const layer of [links, ...rings]) {
     layer.object.position.copy(offset);
@@ -377,12 +373,10 @@ function start({ meta, stimuli, executors, psy, positions, classes }) {
     inputRings.set([]);
     outputRings.set([]);
     links.set([]);
-    shape.clear();
     try {
       const info = await getInfo(index);
       if (pinned !== index) return;
       card.showInfo(info);
-      showShape(index);
       const connections = await getLinks(index);
       if (pinned !== index) return;
       card.showLinks(connections);
@@ -414,43 +408,9 @@ function start({ meta, stimuli, executors, psy, positions, classes }) {
     links.set(lines);
   }
 
-  // ---------- форма нейрона (C12b, D-037) ----------
-  let shapesOn = false;
-  const SHAPE_NEAR_UM = 5; // как порог проверки координат в flybrain/skeletons.py
-  const SHAPE_HINT = "Скелет нейрона из FlyWire (Schlegel et al. 2024, CC BY 4.0): упрощённая форма, построенная " +
-    "по объёмной модели клетки. Расстояние — от точки нейрона в облаке до ближайшей точки формы: если координаты " +
-    "совпадают, оно меньше нескольких микрометров (тело клетки — 2–5 мкм).";
-
-  async function showShape(index) {
-    if (!shapesOn) {
-      shape.clear();
-      card.showShape("");
-      return;
-    }
-    card.showShape("Форма: загружаю…", SHAPE_HINT);
-    try {
-      const skeleton = await getSkeleton(index);
-      if (pinned !== index || !shapesOn) return;
-      if (!skeleton) {
-        shape.clear();
-        card.showShape("Форма: для этого нейрона в файле скелетов её нет.", SHAPE_HINT);
-        return;
-      }
-      shape.show(skeleton);
-      const points = `${formatInt(skeleton.count)} ${plural(skeleton.count, "точка", "точки", "точек")} скелета`;
-      const distance = Number.isNaN(skeleton.distanceUm) ? ""
-        : `; точка нейрона — в ${formatNumber(skeleton.distanceUm, 1)} мкм от формы` +
-          (skeleton.distanceUm > SHAPE_NEAR_UM ? " (дальше обычного)" : "");
-      card.showShape(`Форма (белые ветки): ${points}${distance}.`, SHAPE_HINT);
-    } catch (error) {
-      if (pinned === index) card.showShape(`Форма: не получилось загрузить (${error.message}).`, SHAPE_HINT);
-    }
-  }
-
   function unpin() {
     pinned = -1;
     executorPanel?.setPinned(-1);
-    shape.clear();
     pinnedRing.set([]);
     inputRings.set([]);
     outputRings.set([]);
@@ -543,16 +503,6 @@ function start({ meta, stimuli, executors, psy, positions, classes }) {
   // ---------- вид: только активные, контур, яркость ----------
   let activeOnly = false;
   const hintElement = document.getElementById("active-hint");
-  const toastElement = document.getElementById("toast");
-  let toastTimer = null;
-
-  function showToast(text) {
-    toastElement.textContent = text;
-    toastElement.hidden = false;
-    clearTimeout(toastTimer);
-    toastTimer = setTimeout(() => { toastElement.hidden = true; }, TOAST_MS);
-  }
-
   const compass = createCompass(document.getElementById("compass"), camera);
   const fps = createFpsMeter(document.getElementById("fps"));
 
@@ -565,20 +515,14 @@ function start({ meta, stimuli, executors, psy, positions, classes }) {
       pickDirty = true;
     },
     onShell: (flag) => silhouette.setVisible(flag),
-    onShapes(flag) {
-      shapesOn = flag;
-      if (pinned >= 0) showShape(pinned);
-    },
-    onShapesMissing: (text) => showToast(text),
-    // Две яркости (D-048): «неактивные» — тусклое облако, контур мозга и форма нейрона; «активные» — вспышки и ореол.
+    // Две яркости (D-048): «неактивные» — тусклое облако, контур мозга; «активные» — вспышки и ореол.
     onIdleBrightness(value) {
       material.uniforms.uAlpha.value = POINT_ALPHA * value;
       silhouette.setBrightness(value);
-      shape.setBrightness(value);
     },
     onActiveBrightness: (value) => glow.setBrightness(value),
     onTrail: (seconds) => glow.setTrail(seconds),
-  }, meta.skeletons);
+  });
 
   createPanelsToggle();
   createPanelResizers();
@@ -742,7 +686,7 @@ function start({ meta, stimuli, executors, psy, positions, classes }) {
   buildLegend(meta);
   statusEl.textContent = `Показано нейронов: ${formatInt(meta.shown)} из ${formatInt(meta.total)}`;
   document.getElementById("search").hidden = false;
-  window.flybrain = { camera, controls, renderer, scene, picker, pin, unpin, live, glow, silhouette, shape, flyToView, fps }; // для отладки в консоли браузера
+  window.flybrain = { camera, controls, renderer, scene, picker, pin, unpin, live, glow, silhouette, flyToView, fps }; // для отладки в консоли браузера
 }
 
 // Окно «О проекте» работает и тогда, когда нейроны не загрузились.

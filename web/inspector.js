@@ -151,20 +151,6 @@ export function createCard(root, { onClose, onSelect }) {
       root.querySelector(".card-loading")?.remove();
       body.append(element("p", "card-hint", `Не получилось загрузить связи: ${message}`));
     },
-    /** Строка о форме нейрона (C12b) под описанием; `text` пустой — строки нет. */
-    showShape(text, title = "") {
-      let line = root.querySelector(".card-shape");
-      if (!text) {
-        line?.remove();
-        return;
-      }
-      if (!line) {
-        line = element("p", "card-shape");
-        root.querySelector(".neuron-rows")?.after(line);
-      }
-      line.textContent = text;
-      line.title = title;
-    },
     hide() {
       root.hidden = true;
     },

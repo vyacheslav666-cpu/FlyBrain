@@ -19,7 +19,7 @@ FAIL = "ОШИБКА"
 EXPECTED_PYTHON = (3, 12)
 MAX_PATH_LEN = 100
 MIN_FREE_GB = 8  # данные и результаты M1 (docs/SETUP.md)
-COMFY_FREE_GB = 15  # плюс необязательные скелеты нейронов, 5,4 ГБ
+COMFY_FREE_GB = 15  # с запасом под новые прогоны и отчёты
 EXPECTED_GPU = "RTX 5070"
 
 _COLORS = {OK: "32", WARN: "33", FAIL: "31"}
@@ -132,7 +132,7 @@ def check_disk() -> Check:
     if free_gb < MIN_FREE_GB:
         return Check(FAIL, "Место на диске", f"{detail}; нужно не меньше {MIN_FREE_GB} ГБ")
     if free_gb < COMFY_FREE_GB:
-        return Check(WARN, "Место на диске", f"{detail}; для всех необязательных данных лучше {COMFY_FREE_GB} ГБ")
+        return Check(WARN, "Место на диске", f"{detail}; с запасом лучше {COMFY_FREE_GB} ГБ")
     return Check(OK, "Место на диске", f"{detail} (нужно около {MIN_FREE_GB} ГБ)")
 
 

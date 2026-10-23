@@ -24,10 +24,6 @@ def main(argv: list[str] | None = None) -> int:
     subparsers.add_parser("doctor", help="проверить, что машина готова к работе")
     subparsers.add_parser("fetch-data", help="скачать данные в data/raw/ и сверить контрольные суммы")
     subparsers.add_parser(
-        "fetch-skeletons",
-        help="необязательно: скачать формы нейронов FlyWire (5,4 ГБ), подготовить их и проверить координаты",
-    )
-    subparsers.add_parser(
         "build-data", help="собрать таблицу нейронов, матрицу связей, группы и картинку в data/processed/"
     )
     reference = subparsers.add_parser(
@@ -74,10 +70,6 @@ def main(argv: list[str] | None = None) -> int:
         from flybrain.fetch import run_fetch_data
 
         return run_fetch_data()
-    if args.command == "fetch-skeletons":
-        from flybrain.skeletons import run_fetch_skeletons
-
-        return run_fetch_skeletons()
     if args.command == "build-data":
         from flybrain.build import run_build_data
 

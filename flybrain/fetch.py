@@ -30,10 +30,9 @@ class Source:
     dest: Path
 
 
-def load_sources(path: Path = SOURCES_FILE, root: Path = PROJECT_ROOT, section: str = "files") -> list[Source]:
-    """`section`: `files` — обязательные данные (`fetch-data`), `optional` — необязательные (скелеты, D-037)."""
+def load_sources(path: Path = SOURCES_FILE, root: Path = PROJECT_ROOT) -> list[Source]:
     with open(path, encoding="utf-8") as handle:
-        entries = yaml.safe_load(handle)[section]
+        entries = yaml.safe_load(handle)["files"]
     return [
         Source(
             name=entry["name"],

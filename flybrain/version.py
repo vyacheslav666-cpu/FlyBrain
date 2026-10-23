@@ -13,7 +13,6 @@ _WATCHED = (
     ("web", "*.css"),
     ("config", "*.yaml"),
     ("data/processed", "build_info.json"),  # после нового `build-data` сервер тоже устарел
-    ("data/processed/skeletons", "info.json"),  # и после `fetch-skeletons`: появились формы нейронов (D-037)
 )
 
 

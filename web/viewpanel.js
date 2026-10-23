@@ -1,4 +1,4 @@
-// Панель «Вид» (C12): вид по умолчанию, «только активные», формы нейронов (C12b), контур мозга,
+// Панель «Вид» (C12): вид по умолчанию, «только активные», контур мозга,
 // яркость активных и неактивных нейронов (D-048) и шлейф.
 // Настройки запоминаются в браузере (localStorage); если он недоступен — страница работает без запоминания.
 
@@ -28,29 +28,24 @@ function savePrefs(prefs) {
   }
 }
 
-const SHAPES_TITLE = "По щелчку на нейрон показывает его настоящую форму — скелет из FlyWire (Schlegel et al. 2024, " +
-  "CC BY 4.0), упрощённый. Только показ: модель не меняется";
-const SHAPES_MISSING = "Формы нейронов не скачаны. Это необязательная загрузка 5,4 ГБ: команда " +
-  "«uv run flybrain fetch-skeletons» в PowerShell в папке проекта, затем перезапустите run.bat";
-
 /**
- * `handlers`: onView(name), onActiveOnly(bool), onShell(bool), onShapes(bool), onActiveBrightness(value), onIdleBrightness(value),
- * onTrail(seconds), onShapesMissing(text). `shapes` — {available, reason} из /api/meta (D-037).
+ * `handlers`: onView(name), onActiveOnly(bool), onShell(bool), onActiveBrightness(value), onIdleBrightness(value),
+ * onTrail(seconds).
  * Сохранённые значения применяются сразу, через те же обработчики.
  */
-export function createViewPanel(handlers, shapes) {
+export function createViewPanel(handlers) {
   const $ = (id) => document.getElementById(id);
   const prefs = {
-    activeOnly: false, shell: true, shapes: true, trail: TRAIL.start, ...loadPrefs(),
+    activeOnly: false, shell: true, trail: TRAIL.start, ...loadPrefs(),
   };
   // До D-048 яркость была одна — она становится начальной для обеих.
   prefs.brightActive ??= prefs.brightness ?? BRIGHTNESS.start;
   prefs.brightIdle ??= prefs.brightness ?? BRIGHTNESS.start;
   delete prefs.brightness;
+  delete prefs.shapes; // флажок «Формы нейронов» убран (D-067)
   const viewButtons = [...document.querySelectorAll("#view [data-view]")];
   const activeButton = $("view-active");
   const shellButton = $("view-shell");
-  const shapesButton = $("view-shapes");
   const trail = $("view-trail");
 
   function remember(patch) {
@@ -74,19 +69,6 @@ export function createViewPanel(handlers, shapes) {
     setToggle(shellButton, value);
     remember({ shell: value });
     handlers.onShell(value);
-  });
-  // Без скачанных скелетов флажок бледный и не включается; щелчок объясняет, как их получить.
-  shapesButton.title = shapes.available ? SHAPES_TITLE : `${SHAPES_MISSING} (сейчас: ${shapes.reason}).`;
-  shapesButton.setAttribute("aria-disabled", String(!shapes.available));
-  shapesButton.addEventListener("click", () => {
-    if (!shapes.available) {
-      handlers.onShapesMissing(SHAPES_MISSING);
-      return;
-    }
-    const value = shapesButton.getAttribute("aria-pressed") !== "true";
-    setToggle(shapesButton, value);
-    remember({ shapes: value });
-    handlers.onShapes(value);
   });
 
   /** Ползунок яркости: `id` — его поле, `key` — имя в сохранённых настройках, `handler` — куда отдать значение. */
@@ -118,13 +100,11 @@ export function createViewPanel(handlers, shapes) {
   trail.value = String(prefs.trail);
   setToggle(activeButton, prefs.activeOnly);
   setToggle(shellButton, prefs.shell);
-  setToggle(shapesButton, shapes.available && prefs.shapes);
   brightnessSlider("view-bright-active", "brightActive", handlers.onActiveBrightness);
   brightnessSlider("view-bright-idle", "brightIdle", handlers.onIdleBrightness);
   applyTrail();
   handlers.onActiveOnly(prefs.activeOnly);
   handlers.onShell(prefs.shell);
-  handlers.onShapes(shapes.available && prefs.shapes);
   $("view").hidden = false;
 
   return {
