@@ -119,6 +119,7 @@ class P1bConfig:
     kc_runaway_doses: tuple[float, ...]
     kc_doses: tuple[float, ...]
     kc_runaway_dose: float | None
+    kc_threshold_doses: tuple[float, ...]
     kc_spont_sigma_mv: float
     hyst_trials: int
     hyst_sigma_mv: float
@@ -145,6 +146,7 @@ def _load_p1b(raw: dict | None) -> P1bConfig | None:
         mech_dose_doses=tuple(float(d) for d in mech["dose_check"]["doses"]),
         kc_runaway_doses=tuple(float(d) for d in kc["runaway_doses"]), kc_doses=tuple(float(d) for d in kc["doses"]),
         kc_runaway_dose=None if kc.get("runaway_dose") is None else float(kc["runaway_dose"]),
+        kc_threshold_doses=tuple(float(d) for d in kc["threshold_doses"]),
         kc_spont_sigma_mv=float(kc["spont_sigma_mv"]), hyst_trials=int(hyst["trials"]),
         hyst_sigma_mv=float(hyst["sigma_mv"]), hyst_condition=hyst["condition"], hyst_on_ms=float(hyst["on_ms"]),
         hyst_back_ms=float(hyst["back_ms"]), hyst_quiet_ms=float(hyst["quiet_ms"]),
@@ -409,7 +411,7 @@ def plan_p1b(config: PsyConfig, parts: list[str]) -> list[RunSpec]:
                   for d in b.kc_main_doses for c in config.conditions]
     if "kc_thresholds" in parts:
         specs += [kc_spec(main("thresholds", c, f, d, config.threshold_trials, 0.0))
-                  for d in b.kc_doses for c in config.conditions for f in c.threshold_hz]
+                  for d in b.kc_threshold_doses for c in config.conditions for f in c.threshold_hz]
     if "kc_spont" in parts:
         specs += [kc_spec(RunSpec("spont", None, 0.0, d, config.criterion, b.kc_spont_sigma_mv, config.spont_trials,
                                   config.warmup_ms, config.stimulus_ms, 0.0)) for d in b.kc_main_doses]

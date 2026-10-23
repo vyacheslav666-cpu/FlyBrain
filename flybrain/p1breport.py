@@ -23,6 +23,7 @@ MODE_RU = {"p1": "P1: все мишени возбуждаются", "kc_inhibit
 MODE_SHORT = {"p1": "P1", "kc_inhibit": "KC тормозятся"}
 COLOR_MODE = {"p1": CATEGORICAL[0], "kc_inhibit": CATEGORICAL[1]}
 PROTOCOL_RU = {"noise": "с шумом σ, без стимула", "stimulus": "без шума, зажигание стимулом"}
+PROTOCOL_SHORT = {"noise": "шум σ", "stimulus": "без шума, стимул"}
 PHASE_RU = {"A": "доза разгона", "B": "доза 0", "C": "доза 0, шум выключен", "D": "после сброса потенциалов"}
 
 
@@ -316,29 +317,39 @@ FIGURES = {
 
 
 def figure_mechanism(results: Results, path: Path) -> bool:
+    """Тепловая карта «вариант связей × шум»: в скольких повторах из 10 активность после шума не гаснет."""
     import matplotlib.pyplot as plt
+    from matplotlib.colors import LinearSegmentedColormap
 
     table = mechanism_table(results)
     if not table:
         return False
-    fig, (ax1, ax2) = _figure(plt, 2, 4.8, 3.6)
-    for color, variant in zip(CATEGORICAL, results.setup.config.p1b.mech_variants):
-        rows = table.get(variant, [])
-        x = [r[0] for r in rows]
-        ax1.plot(x, [100 * r[1] / r[2] for r in rows], color=color, linewidth=2, marker="o", markersize=6,
-                 markeredgecolor=SURFACE, label=VARIANTS[variant])
-        ax2.plot(x, [max(r[3], 0.01) for r in rows], color=color, linewidth=2, marker="o", markersize=6,
-                 markeredgecolor=SURFACE, label=VARIANTS[variant])
-    ax1.set_ylim(-4, 104)
-    ax1.set_title("повторов, где после шума не гаснет, %", fontsize=9, color=INK, loc="left")
-    ax2.set_yscale("log")
-    ax2.set_title("средняя частота клеток Кеньона во время шума, Гц", fontsize=9, color=INK, loc="left")
-    for ax in (ax1, ax2):
-        _style(ax)
-        ax.set_xlabel("шум σ, мВ", color=INK_2, fontsize=9)
-    ax1.legend(frameon=False, fontsize=7.5, labelcolor=INK_2, loc="center right")
+    variants = [v for v in results.setup.config.p1b.mech_variants if v in table]
+    sigmas = sorted({row[0] for rows in table.values() for row in rows})
+    share = np.full((len(variants), len(sigmas)), np.nan)
+    labels = [["" for _ in sigmas] for _ in variants]
+    for i, v in enumerate(variants):
+        for sigma, k, n, rate_kc, _after in table[v]:
+            j = sigmas.index(sigma)
+            share[i, j] = k / n
+            labels[i][j] = f"{k}/{n}\nKC {number(rate_kc, 1)}"
+    cmap = LinearSegmentedColormap.from_list("seq", [SURFACE, "#9ec5f4", "#2a6fc4", "#123a6e"])
+    fig, ax = plt.subplots(figsize=(10.5, 0.55 * len(variants) + 1.8), facecolor=SURFACE)
+    ax.imshow(share, cmap=cmap, vmin=0, vmax=1, aspect="auto")
+    for i in range(len(variants)):
+        for j in range(len(sigmas)):
+            ax.text(j, i, labels[i][j], ha="center", va="center", fontsize=7,
+                    color=SURFACE if share[i, j] > 0.55 else INK_2)
+    ax.set_xticks(range(len(sigmas)), [number(s, 2) for s in sigmas], fontsize=8, color=INK_2)
+    ax.set_yticks(range(len(variants)), [VARIANTS[v] for v in variants], fontsize=8, color=INK_2)
+    ax.set_xlabel("шум σ, мВ", color=INK_2, fontsize=9)
+    for side in ax.spines.values():
+        side.set_visible(False)
+    ax.tick_params(length=0)
+    ax.categorical_x = ax.categorical_y = True
     _finish(fig, plt, path, "Откуда «зажигание»: доза 0, шум 1 с, затем шум выключен",
-            "[ЧЕСТНОСТЬ] варианты связей — проверка свойства модели Shiu, не новая модель (D-058)")
+            "в клетке: повторов, где после шума не гаснет; частота клеток Кеньона во время шума, Гц. "
+            "[ЧЕСТНОСТЬ] Варианты — проверка модели Shiu (D-058)")
     return True
 
 
@@ -367,7 +378,9 @@ def figure_compare(results: Results, path: Path) -> bool:
         for row in (0, 1):
             _style(axes[row][col])
             axes[row][col].set_xlabel("доза d", color=INK_2, fontsize=9)
-    axes[0][0].legend(frameon=False, fontsize=8, labelcolor=INK_2, loc="upper left")
+    handles, labels = axes[0][0].get_legend_handles_labels()
+    fig.legend(handles, labels, loc="lower right", ncols=2, frameon=False, fontsize=8, labelcolor=INK_2,
+               bbox_to_anchor=(0.995, 0.0))
     _finish(fig, plt, path, "P1 и «KC тормозятся»: частота исполнителя и незатухающая активность",
             "синий — P1 (все мишени возбуждаются), оранжевый — у клеток Кеньона порог от дозы повышается (D-060)")
     return True
@@ -388,7 +401,7 @@ def figure_hysteresis(hysteresis: list[dict], path: Path) -> bool:
         ax.set_yscale("log")
         _style(ax)
         p = h["plan"]
-        ax.set_title(f"{MODE_SHORT[p['mode']]}, {PROTOCOL_RU[p['protocol']]}", fontsize=8.5, color=INK, loc="left")
+        ax.set_title(f"{MODE_SHORT[p['mode']]}, {PROTOCOL_SHORT[p['protocol']]}", fontsize=8.5, color=INK, loc="left")
         ax.set_xlabel("время, мс", color=INK_2, fontsize=9)
     axes[0].set_ylabel("спайков/с во всём мозге", color=INK_2, fontsize=9)
     _finish(fig, plt, path, "Гистерезис: доза разгона → доза 0 → шум выключен → сброс потенциалов",

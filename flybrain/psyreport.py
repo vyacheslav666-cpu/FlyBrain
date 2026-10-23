@@ -516,7 +516,9 @@ def _finish(fig, plt, path: Path, title: str, note: str | None = None) -> None:
     for ax in fig.axes:
         if not getattr(ax, "categorical_x", False):
             ax.xaxis.set_major_formatter(FuncFormatter(_comma))
-        if ax.get_yscale() == "linear":
+        if getattr(ax, "categorical_y", False):
+            pass
+        elif ax.get_yscale() == "linear":
             ax.yaxis.set_major_formatter(FuncFormatter(_comma))
         else:  # логарифмическая шкала: только 1, 10, 100… обычными числами
             ax.yaxis.set_major_locator(LogLocator(base=10))
