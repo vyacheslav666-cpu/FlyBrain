@@ -122,8 +122,16 @@ def saturation(s: np.ndarray, s_half: float) -> np.ndarray:
     return s / (s + float(s_half))
 
 
-def threshold_shift(s: np.ndarray, dose: float, delta_v_mv: float, s_half: float) -> np.ndarray:
-    """Насколько снижен порог каждого нейрона, мВ: d · ΔV · h(s_i). При d = 0 — все нули."""
+def threshold_shift(s: np.ndarray, dose: float, delta_v_mv: float, s_half: float,
+                    inverted: np.ndarray | None = None) -> np.ndarray:
+    """Насколько снижен порог каждого нейрона, мВ: d · ΔV · h(s_i). При d = 0 — все нули.
+
+    `inverted` (булев массив) — у этих нейронов эффект обратный: порог на столько же **повышается**
+    (режим «KC тормозятся» эксперимента P1b, D-060: рецептор 5-HT1A у клеток Кеньона).
+    """
     if dose < 0:
         raise ValueError("доза не может быть отрицательной")
-    return float(dose) * float(delta_v_mv) * saturation(s, s_half)
+    shift = float(dose) * float(delta_v_mv) * saturation(s, s_half)
+    if inverted is not None:
+        shift = np.where(inverted, -shift, shift)
+    return shift
